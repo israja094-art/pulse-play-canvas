@@ -11,7 +11,8 @@ import {
   Shuffle,
   Repeat,
 } from "lucide-react";
-import { songs, formatTime } from "@/lib/media-data";
+import { formatTime } from "@/lib/media-data";
+import { useMediaStore } from "@/lib/media-store";
 
 export const Route = createFileRoute("/music/$id")({
   component: NowPlaying,
@@ -20,11 +21,19 @@ export const Route = createFileRoute("/music/$id")({
 function NowPlaying() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
+  const { songs } = useMediaStore();
   const idx = Math.max(
     0,
-    songs.findIndex((s) => s.id === id)
+    songs.findIndex((s) => s.id === id),
   );
   const song = songs[idx];
+  if (!song) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground">
+        No song
+      </div>
+    );
+  }
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
