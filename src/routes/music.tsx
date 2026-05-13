@@ -5,6 +5,7 @@ import { BottomTabs } from "@/components/BottomTabs";
 import { SearchBar } from "@/components/SearchBar";
 import { Logo } from "@/components/Logo";
 import { useLongPress } from "@/hooks/use-long-press";
+import { playSongNow } from "@/lib/audio-player";
 import {
   useMediaStore,
   importAudioFiles,
@@ -148,7 +149,10 @@ function MusicPage() {
               song={s}
               selectMode={selectMode}
               selected={selected.has(s.id)}
-              onOpen={() => navigate({ to: "/music/$id", params: { id: s.id } })}
+              onOpen={() => {
+                playSongNow({ id: s.id, src: s.src });
+                navigate({ to: "/music/$id", params: { id: s.id } });
+              }}
               onToggle={() => toggle(s.id)}
               onLongPress={() => enterSelect(s.id)}
             />

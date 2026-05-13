@@ -12,6 +12,7 @@ import {
   Repeat,
 } from "lucide-react";
 import { formatTime } from "@/lib/media-data";
+import { getSharedAudio, syncSongSource } from "@/lib/audio-player";
 import { useMediaStore } from "@/lib/media-store";
 
 export const Route = createFileRoute("/music/$id")({
@@ -23,7 +24,7 @@ function NowPlaying() {
   const navigate = useNavigate();
   const { songs } = useMediaStore();
 
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -35,8 +36,10 @@ function NowPlaying() {
   const song = songs[idx];
 
   useEffect(() => {
-    const a = audioRef.current;
-    if (!a || !song) return;
+    if (!song) return;
+    const a = syncSongSource({ id: song.id, src: song.src });
+    audioRef.current = a;
+    if (!a) return;
     setCurrent(0);
     const tryPlay = async () => {
       try {
@@ -119,7 +122,7 @@ function NowPlaying() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary/20 via-background to-background mx-auto max-w-md flex flex-col">
-      <audio ref={audioRef} src={song.src} preload="metadata" />
+      <audio ref={(node) => { if (node) audioRef.current = node; }} src={song.src} preload="metadata" hidden />
       <header className="flex items-center justify-between px-4 py-3">
         <button onClick={() => navigate({ to: "/music" })} aria-label="Close">
           <ChevronDown className="h-6 w-6 text-primary" />
