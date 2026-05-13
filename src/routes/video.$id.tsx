@@ -106,13 +106,24 @@ function VideoPage() {
                   >
                     <Play className="h-4 w-4" /> Play
                   </button>
-                  <button className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent/20">
-                    <AudioLines className="h-4 w-4" /> Share
+                  <button
+                    onClick={() => {
+                      shareItems([{ title: v.title, src: v.src }]);
+                      setOpenMenu(null);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent/20"
+                  >
+                    <Share2 className="h-4 w-4" /> Share
                   </button>
                   <button
                     onClick={() => {
-                      setList((l) => l.filter((x) => x.id !== v.id));
+                      deleteVideos([v.id]);
                       setOpenMenu(null);
+                      if (v.id === current.id) {
+                        const remaining = list.filter((x) => x.id !== v.id);
+                        if (remaining.length) navigate({ to: "/video/$id", params: { id: remaining[0].id } });
+                        else navigate({ to: "/" });
+                      }
                     }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-accent/20"
                   >
