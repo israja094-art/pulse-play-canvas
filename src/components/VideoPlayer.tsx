@@ -14,6 +14,11 @@ import { formatTime } from "@/lib/media-data";
 
 const SPEEDS = [0.5, 1, 1.25, 1.5, 2];
 
+type VideoEl = HTMLVideoElement & {
+  webkitEnterFullscreen?: () => void;
+  webkitDisplayingFullscreen?: boolean;
+};
+
 export function VideoPlayer({
   src,
   poster,
@@ -158,17 +163,25 @@ export function VideoPlayer({
     const v = videoRef.current;
     if (!v) return;
     v.muted = !v.muted;
+    if (!v.muted && v.volume === 0) {
+      v.volume = 1;
+      setVolume(1);
+    }
     setMuted(v.muted);
     reveal();
   };
 
   const toggleFullscreen = () => {
     const el = wrapRef.current;
-    if (!el) return;
-    if (!document.fullscreenElement) {
-      el.requestFullscreen?.().catch(() => {});
+    const v = videoRef.current as VideoEl | null;
+    if (!el || !v) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen?.().catch(() => {});
+    } else if (el.requestFullscreen) {
+      el.requestFullscreen().catch(() => {});
     } else {
-      document.exitFullscreen?.();
+      v.webkitEnterFullscreen?.();
+      return;
     }
     reveal();
   };
@@ -306,8 +319,15 @@ export function VideoPlayer({
         className="w-full h-full object-contain bg-black"
         playsInline
         autoPlay
+        muted={muted}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
+        onVolumeChange={() => {
+          const v = videoRef.current;
+          if (!v) return;
+          setMuted(v.muted);
+          setVolume(v.volume);
+        }}
       />
 
       {/* Top bar icons */}
