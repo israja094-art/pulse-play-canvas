@@ -176,13 +176,13 @@ function SongRow({
   onToggle: () => void;
   onLongPress: () => void;
 }) {
-  const lp = useLongPress(onLongPress, 450);
+  const { didTrigger, ...pressHandlers } = useLongPress(onLongPress, 450);
   return (
     <li>
       <button
-        {...lp}
+        {...pressHandlers}
         onClick={() => {
-          if (lp.didTrigger()) return;
+          if (didTrigger()) return;
           if (selectMode) onToggle();
           else onOpen();
         }}

@@ -69,12 +69,13 @@ function VideoPage() {
           const active = v.id === current.id;
           return (
             <li key={v.id} className="relative">
-              <button
-                onClick={() => navigate({ to: "/video/$id", params: { id: v.id } })}
-                className={`w-full flex gap-3 items-center px-4 py-2 text-left ${
-                  active ? "bg-primary/10" : ""
-                }`}
+              <div
+                className={`flex gap-3 items-center px-4 py-2 ${active ? "bg-primary/10" : ""}`}
               >
+                <button
+                  onClick={() => navigate({ to: "/video/$id", params: { id: v.id } })}
+                  className="flex flex-1 items-center gap-3 min-w-0 text-left"
+                >
                 <div className="relative w-24 h-14 rounded-md overflow-hidden flex-shrink-0 bg-muted">
                   <img src={v.thumb} alt={v.title} className="w-full h-full object-cover" />
                   <span className="absolute bottom-0.5 right-0.5 bg-black/80 text-white text-[9px] px-1 rounded">
@@ -88,6 +89,7 @@ function VideoPage() {
                 >
                   {v.title}
                 </p>
+                </button>
                 {active ? (
                   <AudioLines className="h-4 w-4 text-primary flex-shrink-0" />
                 ) : (
@@ -102,7 +104,7 @@ function VideoPage() {
                     <MoreVertical className="h-4 w-4" />
                   </button>
                 )}
-              </button>
+              </div>
               {openMenu === v.id && (
                 <div
                   ref={menuRef}
