@@ -45,6 +45,7 @@ export function VideoPlayer({
   const [volume, setVolume] = useState(1);
   const [overlay, setOverlay] = useState<string | null>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTapRef = useRef<{ t: number; x: number } | null>(null);
 
   const armHide = useCallback(() => {
     if (hideTimer.current) clearTimeout(hideTimer.current);
@@ -86,7 +87,6 @@ export function VideoPlayer({
     };
   }, [onEnded]);
 
-  // EQ wiring via WebAudio
   const ensureAudioGraph = useCallback(() => {
     const v = videoRef.current;
     if (!v || sourceRef.current) return;
@@ -116,7 +116,6 @@ export function VideoPlayer({
   useEffect(() => {
     const nodes = eqNodesRef.current;
     if (!nodes) return;
-    // map 0..100 → -12..+12 dB
     const toDb = (v: number) => ((v - 50) / 50) * 12;
     nodes.bass.gain.value = toDb(eq.bass);
     nodes.mid.gain.value = toDb(eq.mid);
@@ -126,16 +125,25 @@ export function VideoPlayer({
   const togglePlay = () => {
     const v = videoRef.current;
     if (!v) return;
-    ensureAudioGraph();
     audioCtxRef.current?.resume();
     if (v.paused) {
-      v.play();
+      v.play().catch(() => {});
       setPlaying(true);
     } else {
       v.pause();
       setPlaying(false);
     }
     reveal();
+  };
+
+  const seekBy = (delta: number) => {
+    const v = videoRef.current;
+    if (!v) return;
+    const next = Math.max(0, Math.min((v.duration || 0), v.currentTime + delta));
+    v.currentTime = next;
+    setCurrent(next);
+    setOverlay(`${delta > 0 ? "+" : ""}${Math.round(delta)}s`);
+    setTimeout(() => setOverlay(null), 600);
   };
 
   const onSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -174,14 +182,16 @@ export function VideoPlayer({
     reveal();
   };
 
-  // Gestures: left half = brightness (vertical), right half = volume (vertical)
+  // Gestures
   const gesture = useRef<{
     x: number;
     y: number;
     side: "L" | "R";
-    mode: "" | "v";
+    mode: "" | "v" | "h";
     startVol: number;
     startBri: number;
+    startTime: number;
+    width: number;
   } | null>(null);
 
   const onTouchStart = (e: React.TouchEvent) => {
@@ -194,6 +204,8 @@ export function VideoPlayer({
       mode: "",
       startVol: volume,
       startBri: brightness,
+      startTime: videoRef.current?.currentTime ?? 0,
+      width: rect.width,
     };
   };
 
@@ -204,12 +216,20 @@ export function VideoPlayer({
     const dx = t.clientX - g.x;
     const dy = t.clientY - g.y;
     if (g.mode === "") {
-      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
-      if (Math.abs(dy) < Math.abs(dx)) return; // ignore horizontal swipes (no seek)
-      g.mode = "v";
+      if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return;
+      g.mode = Math.abs(dx) > Math.abs(dy) ? "h" : "v";
     }
     const v = videoRef.current;
     if (!v) return;
+    if (g.mode === "h") {
+      // 1 minute over full width
+      const seekDelta = (dx / g.width) * 60;
+      const next = Math.max(0, Math.min(v.duration || 0, g.startTime + seekDelta));
+      setOverlay(`${seekDelta >= 0 ? "+" : ""}${Math.round(seekDelta)}s  ${formatTime(next)}`);
+      setCurrent(next);
+      setShowControls(true);
+      return;
+    }
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const ratio = -dy / rect.height;
     if (g.side === "R") {
@@ -225,13 +245,49 @@ export function VideoPlayer({
     setShowControls(true);
   };
 
-  const onTouchEnd = () => {
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const g = gesture.current;
+    if (g && g.mode === "h") {
+      const v = videoRef.current;
+      const last = e.changedTouches[0];
+      if (v && last) {
+        const dx = last.clientX - g.x;
+        const seekDelta = (dx / g.width) * 60;
+        const next = Math.max(0, Math.min(v.duration || 0, g.startTime + seekDelta));
+        v.currentTime = next;
+        setCurrent(next);
+      }
+      gesture.current = null;
+      setTimeout(() => setOverlay(null), 600);
+      armHide();
+      return;
+    }
+    // Treat as tap → check double-tap
+    if (g && g.mode === "") {
+      const now = Date.now();
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const x = (e.changedTouches[0]?.clientX ?? g.x) - rect.left;
+      if (lastTapRef.current && now - lastTapRef.current.t < 300) {
+        const sameSide =
+          (lastTapRef.current.x < rect.width / 2 && x < rect.width / 2) ||
+          (lastTapRef.current.x >= rect.width / 2 && x >= rect.width / 2);
+        if (sameSide) {
+          seekBy(x >= rect.width / 2 ? 10 : -10);
+          lastTapRef.current = null;
+          gesture.current = null;
+          armHide();
+          return;
+        }
+      }
+      lastTapRef.current = { t: now, x };
+    }
     gesture.current = null;
     setTimeout(() => setOverlay(null), 600);
     armHide();
   };
 
   const pct = duration ? (current / duration) * 100 : 0;
+  const stopBubble = (e: React.SyntheticEvent) => e.stopPropagation();
 
   return (
     <div
@@ -256,23 +312,23 @@ export function VideoPlayer({
 
       {/* Top bar icons */}
       <div
-        className={`absolute top-0 left-0 right-0 flex items-center justify-end gap-2 p-3 bg-gradient-to-b from-black/70 to-transparent transition-opacity ${
+        onTouchStart={stopBubble}
+        onTouchEnd={stopBubble}
+        onTouchMove={stopBubble}
+        className={`absolute top-0 left-0 right-0 flex items-center justify-end gap-1 p-2 bg-gradient-to-b from-black/70 to-transparent transition-opacity ${
           showControls ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
       >
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleMute();
-          }}
+          onClick={(e) => { stopBubble(e); toggleMute(); }}
           aria-label="Mute"
-          className="text-primary p-2"
+          className="text-primary p-2.5 active:scale-95"
         >
           {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
         </button>
         <button
           onClick={(e) => {
-            e.stopPropagation();
+            stopBubble(e);
             ensureAudioGraph();
             audioCtxRef.current?.resume();
             setShowEq((s) => !s);
@@ -280,40 +336,39 @@ export function VideoPlayer({
             reveal();
           }}
           aria-label="Equalizer"
-          className="text-primary p-2"
+          className="text-primary p-2.5 active:scale-95"
         >
           <Sliders className="h-5 w-5" />
         </button>
         <button
           onClick={(e) => {
-            e.stopPropagation();
+            stopBubble(e);
             setShowSpeed((s) => !s);
             setShowEq(false);
             reveal();
           }}
           aria-label="Speed"
-          className="text-primary p-2 flex items-center gap-1"
+          className="text-primary p-2.5 flex items-center gap-1 active:scale-95"
         >
           <Gauge className="h-5 w-5" />
           <span className="text-xs">{speed}x</span>
         </button>
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleFullscreen();
-          }}
+          onClick={(e) => { stopBubble(e); toggleFullscreen(); }}
           aria-label="Fullscreen"
-          className="text-primary p-2"
+          className="text-primary p-2.5 active:scale-95"
         >
           <Maximize className="h-5 w-5" />
         </button>
       </div>
 
-      {/* Speed menu */}
       {showSpeed && (
         <div
           className="absolute top-14 right-3 bg-black/90 rounded-lg p-2 z-20 flex flex-col gap-1"
-          onClick={(e) => e.stopPropagation()}
+          onClick={stopBubble}
+          onTouchStart={stopBubble}
+          onTouchEnd={stopBubble}
+          onTouchMove={stopBubble}
         >
           {SPEEDS.map((s) => (
             <button
@@ -329,11 +384,13 @@ export function VideoPlayer({
         </div>
       )}
 
-      {/* EQ panel */}
       {showEq && (
         <div
           className="absolute top-14 right-3 bg-black/90 rounded-lg p-3 z-20 w-48 space-y-2"
-          onClick={(e) => e.stopPropagation()}
+          onClick={stopBubble}
+          onTouchStart={stopBubble}
+          onTouchEnd={stopBubble}
+          onTouchMove={stopBubble}
         >
           {(["bass", "mid", "treble"] as const).map((k) => (
             <div key={k}>
@@ -354,69 +411,62 @@ export function VideoPlayer({
         </div>
       )}
 
-      {/* Center prev / play / next video */}
+      {/* Center prev / play / next */}
       <div
         className={`absolute inset-0 flex items-center justify-center gap-8 transition-opacity ${
           showControls ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
       >
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onPrev?.();
-            reveal();
-          }}
+          onClick={(e) => { stopBubble(e); onPrev?.(); reveal(); }}
+          onTouchStart={stopBubble}
+          onTouchEnd={stopBubble}
           className="text-primary p-2"
-          aria-label="Previous video"
+          aria-label="Previous"
         >
           <SkipBack className="h-9 w-9 fill-current" />
         </button>
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            togglePlay();
-          }}
+          onClick={(e) => { stopBubble(e); togglePlay(); }}
+          onTouchStart={stopBubble}
+          onTouchEnd={stopBubble}
           className="text-primary p-2"
           aria-label="Play/Pause"
         >
           {playing ? <Pause className="h-12 w-12 fill-current" /> : <Play className="h-12 w-12 fill-current" />}
         </button>
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onNext?.();
-            reveal();
-          }}
+          onClick={(e) => { stopBubble(e); onNext?.(); reveal(); }}
+          onTouchStart={stopBubble}
+          onTouchEnd={stopBubble}
           className="text-primary p-2"
-          aria-label="Next video"
+          aria-label="Next"
         >
           <SkipForward className="h-9 w-9 fill-current" />
         </button>
       </div>
 
-      {/* Gesture overlay text */}
       {overlay && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="bg-black/70 text-white text-sm px-4 py-2 rounded-lg">{overlay}</div>
         </div>
       )}
 
-      {/* Bottom progress */}
       <div
         className={`absolute bottom-0 left-0 right-0 px-3 pb-2 pt-6 bg-gradient-to-t from-black/80 to-transparent transition-opacity ${
           showControls ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
-        onClick={(e) => e.stopPropagation()}
+        onClick={stopBubble}
+        onTouchStart={stopBubble}
+        onTouchEnd={stopBubble}
+        onTouchMove={stopBubble}
       >
         <div className="flex items-center justify-between text-xs text-white mb-1">
           <span>{formatTime(current)}</span>
           <span>{formatTime(duration)}</span>
         </div>
         <div className="relative h-1 bg-white/30 rounded-full">
-          <div
-            className="absolute left-0 top-0 h-full bg-primary rounded-full"
-            style={{ width: `${pct}%` }}
-          />
+          <div className="absolute left-0 top-0 h-full bg-primary rounded-full" style={{ width: `${pct}%` }} />
           <input
             type="range"
             min={0}
@@ -426,10 +476,7 @@ export function VideoPlayer({
             onChange={onSeek}
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
           />
-          <div
-            className="absolute -top-1 h-3 w-3 rounded-full bg-primary -translate-x-1/2"
-            style={{ left: `${pct}%` }}
-          />
+          <div className="absolute -top-1 h-3 w-3 rounded-full bg-primary -translate-x-1/2" style={{ left: `${pct}%` }} />
         </div>
       </div>
     </div>
