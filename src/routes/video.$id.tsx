@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
-import { ArrowLeft, MoreVertical, Cast, Captions, Trash2, Play, AudioLines } from "lucide-react";
-import { videos } from "@/lib/media-data";
+import { ArrowLeft, MoreVertical, Cast, Captions, Trash2, Play, AudioLines, Share2 } from "lucide-react";
+import { useMediaStore, deleteVideos, shareItems } from "@/lib/media-store";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import { BottomTabs } from "@/components/BottomTabs";
 
@@ -12,7 +12,7 @@ export const Route = createFileRoute("/video/$id")({
 function VideoPage() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
-  const [list, setList] = useState(videos);
+  const { videos: list } = useMediaStore();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const current = list.find((v) => v.id === id) ?? list[0];
@@ -106,13 +106,24 @@ function VideoPage() {
                   >
                     <Play className="h-4 w-4" /> Play
                   </button>
-                  <button className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent/20">
-                    <AudioLines className="h-4 w-4" /> Share
+                  <button
+                    onClick={() => {
+                      shareItems([{ title: v.title, src: v.src }]);
+                      setOpenMenu(null);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent/20"
+                  >
+                    <Share2 className="h-4 w-4" /> Share
                   </button>
                   <button
                     onClick={() => {
-                      setList((l) => l.filter((x) => x.id !== v.id));
+                      deleteVideos([v.id]);
                       setOpenMenu(null);
+                      if (v.id === current.id) {
+                        const remaining = list.filter((x) => x.id !== v.id);
+                        if (remaining.length) navigate({ to: "/video/$id", params: { id: remaining[0].id } });
+                        else navigate({ to: "/" });
+                      }
                     }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-accent/20"
                   >
