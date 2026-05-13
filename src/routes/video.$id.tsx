@@ -14,10 +14,12 @@ function VideoPage() {
   const navigate = useNavigate();
   const { videos: list } = useMediaStore();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const current = list.find((v) => v.id === id) ?? list[0];
 
   useEffect(() => {
+    setMounted(true);
     const onDoc = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpenMenu(null);
     };
@@ -25,6 +27,7 @@ function VideoPage() {
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
+  if (!mounted) return <div className="min-h-screen bg-background" />;
   if (!current) return null;
 
   const idx = list.findIndex((v) => v.id === current.id);
