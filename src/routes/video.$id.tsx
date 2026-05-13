@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
-import { ArrowLeft, MoreVertical, Cast, Captions, Trash2, Play, AudioLines } from "lucide-react";
-import { videos } from "@/lib/media-data";
+import { ArrowLeft, MoreVertical, Cast, Captions, Trash2, Play, AudioLines, Share2 } from "lucide-react";
+import { useMediaStore, deleteVideos, shareItems } from "@/lib/media-store";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import { BottomTabs } from "@/components/BottomTabs";
 
@@ -12,7 +12,7 @@ export const Route = createFileRoute("/video/$id")({
 function VideoPage() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
-  const [list, setList] = useState(videos);
+  const { videos: list } = useMediaStore();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const current = list.find((v) => v.id === id) ?? list[0];
