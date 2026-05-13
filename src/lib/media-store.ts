@@ -23,8 +23,9 @@ const saveDeleted = (key: string, s: Set<string>) => {
   localStorage.setItem(key, JSON.stringify([...s]));
 };
 
-const deletedV = loadDeleted(LS_DELETED_V);
-const deletedS = loadDeleted(LS_DELETED_S);
+let deletedV = new Set<string>();
+let deletedS = new Set<string>();
+let hydratedFromStorage = false;
 
 const userVideos: Video[] = [];
 const userSongs: Song[] = [];
@@ -42,6 +43,12 @@ const emit = () => {
 };
 
 const subscribe = (l: () => void) => {
+  if (!hydratedFromStorage && typeof window !== "undefined") {
+    hydratedFromStorage = true;
+    deletedV = loadDeleted(LS_DELETED_V);
+    deletedS = loadDeleted(LS_DELETED_S);
+    queueMicrotask(() => emit());
+  }
   listeners.add(l);
   return () => listeners.delete(l);
 };

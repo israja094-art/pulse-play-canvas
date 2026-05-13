@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
-import { ArrowLeft, MoreVertical, Cast, Captions, Trash2, Play, AudioLines, Share2 } from "lucide-react";
+import { ArrowLeft, MoreVertical, Trash2, Play, AudioLines, Share2 } from "lucide-react";
 import { useMediaStore, deleteVideos, shareItems } from "@/lib/media-store";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import { BottomTabs } from "@/components/BottomTabs";
@@ -27,42 +27,50 @@ function VideoPage() {
 
   if (!current) return null;
 
-  const goNext = () => {
-    const idx = list.findIndex((v) => v.id === current.id);
-    const next = list[(idx + 1) % list.length];
+  const idx = list.findIndex((v) => v.id === current.id);
+  const goTo = (i: number) => {
+    const len = list.length;
+    if (!len) return;
+    const next = list[((i % len) + len) % len];
     navigate({ to: "/video/$id", params: { id: next.id } });
   };
 
   return (
     <div className="min-h-screen bg-background mx-auto max-w-md pb-20">
-      <VideoPlayer src={current.src} poster={current.thumb} onEnded={goNext} />
-
-      {/* Top floating header over player handled inside; add back/menu bar above player */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-md flex items-center justify-between p-3 z-10 pointer-events-none">
-        <Link to="/" className="text-white p-2 pointer-events-auto" aria-label="Back">
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-        <div className="flex items-center gap-2 pointer-events-auto">
-          <button className="text-white p-2" aria-label="Cast">
-            <Cast className="h-5 w-5" />
-          </button>
-          <button className="text-white p-2" aria-label="Captions">
-            <Captions className="h-5 w-5" />
-          </button>
-          <button className="text-white p-2" aria-label="More">
-            <MoreVertical className="h-5 w-5" />
-          </button>
+      {/* Sticky locked player */}
+      <div className="sticky top-0 z-20 bg-black">
+        <div className="relative">
+          <VideoPlayer
+            src={current.src}
+            poster={current.thumb}
+            onEnded={() => goTo(idx + 1)}
+            onPrev={() => goTo(idx - 1)}
+            onNext={() => goTo(idx + 1)}
+          />
+          <Link
+            to="/"
+            className="absolute top-3 left-3 z-30 text-primary p-2 rounded-full bg-black/40"
+            aria-label="Back"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+        </div>
+        <div className="px-4 py-3 bg-background border-b border-border/50">
+          <h1 className="text-sm font-semibold text-foreground line-clamp-2">{current.title}</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">{current.duration}</p>
         </div>
       </div>
 
-      <ul className="mt-2">
+      <ul>
         {list.map((v) => {
           const active = v.id === current.id;
           return (
             <li key={v.id} className="relative">
               <button
                 onClick={() => navigate({ to: "/video/$id", params: { id: v.id } })}
-                className="w-full flex gap-3 items-center px-4 py-2 text-left"
+                className={`w-full flex gap-3 items-center px-4 py-2 text-left ${
+                  active ? "bg-primary/10" : ""
+                }`}
               >
                 <div className="relative w-24 h-14 rounded-md overflow-hidden flex-shrink-0 bg-muted">
                   <img src={v.thumb} alt={v.title} className="w-full h-full object-cover" />
@@ -72,7 +80,7 @@ function VideoPage() {
                 </div>
                 <p
                   className={`flex-1 text-sm line-clamp-2 ${
-                    active ? "text-primary" : "text-foreground"
+                    active ? "text-primary font-medium" : "text-foreground"
                   }`}
                 >
                   {v.title}

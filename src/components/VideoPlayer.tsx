@@ -18,13 +18,20 @@ export function VideoPlayer({
   src,
   poster,
   onEnded,
+  onPrev,
+  onNext,
 }: {
   src: string;
   poster?: string;
   onEnded?: () => void;
+  onPrev?: () => void;
+  onNext?: () => void;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const eqNodesRef = useRef<{ bass: BiquadFilterNode; mid: BiquadFilterNode; treble: BiquadFilterNode } | null>(null);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
   const [current, setCurrent] = useState(0);
@@ -41,7 +48,11 @@ export function VideoPlayer({
 
   const armHide = useCallback(() => {
     if (hideTimer.current) clearTimeout(hideTimer.current);
-    hideTimer.current = setTimeout(() => setShowControls(false), 3000);
+    hideTimer.current = setTimeout(() => {
+      setShowControls(false);
+      setShowSpeed(false);
+      setShowEq(false);
+    }, 3000);
   }, []);
 
   const reveal = useCallback(() => {
@@ -75,9 +86,48 @@ export function VideoPlayer({
     };
   }, [onEnded]);
 
+  // EQ wiring via WebAudio
+  const ensureAudioGraph = useCallback(() => {
+    const v = videoRef.current;
+    if (!v || sourceRef.current) return;
+    try {
+      const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = new Ctx();
+      const source = ctx.createMediaElementSource(v);
+      const bass = ctx.createBiquadFilter();
+      bass.type = "lowshelf";
+      bass.frequency.value = 200;
+      const mid = ctx.createBiquadFilter();
+      mid.type = "peaking";
+      mid.frequency.value = 1000;
+      mid.Q.value = 1;
+      const treble = ctx.createBiquadFilter();
+      treble.type = "highshelf";
+      treble.frequency.value = 3000;
+      source.connect(bass).connect(mid).connect(treble).connect(ctx.destination);
+      audioCtxRef.current = ctx;
+      sourceRef.current = source;
+      eqNodesRef.current = { bass, mid, treble };
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    const nodes = eqNodesRef.current;
+    if (!nodes) return;
+    // map 0..100 → -12..+12 dB
+    const toDb = (v: number) => ((v - 50) / 50) * 12;
+    nodes.bass.gain.value = toDb(eq.bass);
+    nodes.mid.gain.value = toDb(eq.mid);
+    nodes.treble.gain.value = toDb(eq.treble);
+  }, [eq]);
+
   const togglePlay = () => {
     const v = videoRef.current;
     if (!v) return;
+    ensureAudioGraph();
+    audioCtxRef.current?.resume();
     if (v.paused) {
       v.play();
       setPlaying(true);
@@ -86,12 +136,6 @@ export function VideoPlayer({
       setPlaying(false);
     }
     reveal();
-  };
-
-  const seekBy = (delta: number) => {
-    const v = videoRef.current;
-    if (!v) return;
-    v.currentTime = Math.max(0, Math.min(v.duration || 0, v.currentTime + delta));
   };
 
   const onSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -127,16 +171,15 @@ export function VideoPlayer({
     v.playbackRate = s;
     setSpeed(s);
     setShowSpeed(false);
+    reveal();
   };
 
-  // Gestures: left half = brightness (vertical), right half = volume (vertical),
-  // horizontal = seek
+  // Gestures: left half = brightness (vertical), right half = volume (vertical)
   const gesture = useRef<{
     x: number;
     y: number;
     side: "L" | "R";
-    mode: "" | "h" | "v";
-    startTime: number;
+    mode: "" | "v";
     startVol: number;
     startBri: number;
   } | null>(null);
@@ -149,7 +192,6 @@ export function VideoPlayer({
       y: t.clientY,
       side: t.clientX - rect.left < rect.width / 2 ? "L" : "R",
       mode: "",
-      startTime: videoRef.current?.currentTime ?? 0,
       startVol: volume,
       startBri: brightness,
     };
@@ -163,31 +205,22 @@ export function VideoPlayer({
     const dy = t.clientY - g.y;
     if (g.mode === "") {
       if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
-      g.mode = Math.abs(dx) > Math.abs(dy) ? "h" : "v";
+      if (Math.abs(dy) < Math.abs(dx)) return; // ignore horizontal swipes (no seek)
+      g.mode = "v";
     }
     const v = videoRef.current;
     if (!v) return;
-    if (g.mode === "h") {
-      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-      const ratio = dx / rect.width; // full sweep = 60s
-      const delta = ratio * 60;
-      const next = Math.max(0, Math.min(v.duration || 0, g.startTime + delta));
-      v.currentTime = next;
-      setCurrent(next);
-      setOverlay(`${delta >= 0 ? "+" : ""}${Math.round(delta)}s`);
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const ratio = -dy / rect.height;
+    if (g.side === "R") {
+      const nv = Math.max(0, Math.min(1, g.startVol + ratio));
+      v.volume = nv;
+      setVolume(nv);
+      setOverlay(`Volume ${Math.round(nv * 100)}%`);
     } else {
-      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-      const ratio = -dy / rect.height;
-      if (g.side === "R") {
-        const nv = Math.max(0, Math.min(1, g.startVol + ratio));
-        v.volume = nv;
-        setVolume(nv);
-        setOverlay(`Volume ${Math.round(nv * 100)}%`);
-      } else {
-        const nb = Math.max(20, Math.min(150, g.startBri + ratio * 100));
-        setBrightness(nb);
-        setOverlay(`Brightness ${Math.round(nb)}%`);
-      }
+      const nb = Math.max(20, Math.min(150, g.startBri + ratio * 100));
+      setBrightness(nb);
+      setOverlay(`Brightness ${Math.round(nb)}%`);
     }
     setShowControls(true);
   };
@@ -223,7 +256,7 @@ export function VideoPlayer({
 
       {/* Top bar icons */}
       <div
-        className={`absolute top-0 left-0 right-0 flex items-center justify-end gap-3 p-3 bg-gradient-to-b from-black/70 to-transparent transition-opacity ${
+        className={`absolute top-0 left-0 right-0 flex items-center justify-end gap-2 p-3 bg-gradient-to-b from-black/70 to-transparent transition-opacity ${
           showControls ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
       >
@@ -233,19 +266,21 @@ export function VideoPlayer({
             toggleMute();
           }}
           aria-label="Mute"
-          className="text-white p-2"
+          className="text-primary p-2"
         >
           {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
         </button>
         <button
           onClick={(e) => {
             e.stopPropagation();
+            ensureAudioGraph();
+            audioCtxRef.current?.resume();
             setShowEq((s) => !s);
             setShowSpeed(false);
             reveal();
           }}
           aria-label="Equalizer"
-          className="text-white p-2"
+          className="text-primary p-2"
         >
           <Sliders className="h-5 w-5" />
         </button>
@@ -257,7 +292,7 @@ export function VideoPlayer({
             reveal();
           }}
           aria-label="Speed"
-          className="text-white p-2 flex items-center gap-1"
+          className="text-primary p-2 flex items-center gap-1"
         >
           <Gauge className="h-5 w-5" />
           <span className="text-xs">{speed}x</span>
@@ -268,7 +303,7 @@ export function VideoPlayer({
             toggleFullscreen();
           }}
           aria-label="Fullscreen"
-          className="text-white p-2"
+          className="text-primary p-2"
         >
           <Maximize className="h-5 w-5" />
         </button>
@@ -319,7 +354,7 @@ export function VideoPlayer({
         </div>
       )}
 
-      {/* Center play/pause + skip */}
+      {/* Center prev / play / next video */}
       <div
         className={`absolute inset-0 flex items-center justify-center gap-8 transition-opacity ${
           showControls ? "opacity-100" : "opacity-0 pointer-events-none"
@@ -328,34 +363,34 @@ export function VideoPlayer({
         <button
           onClick={(e) => {
             e.stopPropagation();
-            seekBy(-10);
+            onPrev?.();
             reveal();
           }}
-          className="text-white p-2"
-          aria-label="Back 10s"
+          className="text-primary p-2"
+          aria-label="Previous video"
         >
-          <SkipBack className="h-9 w-9" />
+          <SkipBack className="h-9 w-9 fill-current" />
         </button>
         <button
           onClick={(e) => {
             e.stopPropagation();
             togglePlay();
           }}
-          className="text-white p-2"
+          className="text-primary p-2"
           aria-label="Play/Pause"
         >
-          {playing ? <Pause className="h-12 w-12" /> : <Play className="h-12 w-12" />}
+          {playing ? <Pause className="h-12 w-12 fill-current" /> : <Play className="h-12 w-12 fill-current" />}
         </button>
         <button
           onClick={(e) => {
             e.stopPropagation();
-            seekBy(10);
+            onNext?.();
             reveal();
           }}
-          className="text-white p-2"
-          aria-label="Forward 10s"
+          className="text-primary p-2"
+          aria-label="Next video"
         >
-          <SkipForward className="h-9 w-9" />
+          <SkipForward className="h-9 w-9 fill-current" />
         </button>
       </div>
 
