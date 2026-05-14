@@ -49,8 +49,37 @@ export function VideoPlayer({
   const [brightness, setBrightness] = useState(100);
   const [volume, setVolume] = useState(1);
   const [overlay, setOverlay] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTapRef = useRef<{ t: number; x: number } | null>(null);
+  const lastActionRef = useRef<{ key: string; at: number } | null>(null);
+
+  const flashOverlay = useCallback((text: string, ms = 900) => {
+    setOverlay(text);
+    window.setTimeout(() => setOverlay(null), ms);
+  }, []);
+
+  const runButtonAction = useCallback((key: string, fn: () => void) => {
+    const now = Date.now();
+    if (lastActionRef.current?.key === key && now - lastActionRef.current.at < 250) return;
+    lastActionRef.current = { key, at: now };
+    fn();
+  }, []);
+
+  const stopAndRun = useCallback(
+    (key: string, fn: () => void) =>
+      (e: React.SyntheticEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        runButtonAction(key, fn);
+      },
+    [runButtonAction],
+  );
+
+  const stopPress = useCallback((e: React.SyntheticEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
 
   const armHide = useCallback(() => {
     if (hideTimer.current) clearTimeout(hideTimer.current);
@@ -72,6 +101,31 @@ export function VideoPlayer({
       if (hideTimer.current) clearTimeout(hideTimer.current);
     };
   }, [armHide]);
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement) {
+        setExpanded(false);
+      }
+    };
+
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
+
+  useEffect(() => {
+    if (!expanded) return;
+
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = prevBodyOverflow;
+      document.documentElement.style.overflow = prevHtmlOverflow;
+    };
+  }, [expanded]);
 
   useEffect(() => {
     const v = videoRef.current;
@@ -168,6 +222,7 @@ export function VideoPlayer({
       setVolume(1);
     }
     setMuted(v.muted);
+    flashOverlay(v.muted ? "Muted" : `Volume ${Math.round(v.volume * 100)}%`);
     reveal();
   };
 
@@ -175,14 +230,30 @@ export function VideoPlayer({
     const el = wrapRef.current;
     const v = videoRef.current as VideoEl | null;
     if (!el || !v) return;
-    if (document.fullscreenElement) {
-      document.exitFullscreen?.().catch(() => {});
-    } else if (el.requestFullscreen) {
-      el.requestFullscreen().catch(() => {});
-    } else {
-      v.webkitEnterFullscreen?.();
+
+    if (document.fullscreenElement === el || expanded) {
+      if (document.fullscreenElement === el) {
+        document.exitFullscreen?.().catch(() => setExpanded(false));
+      } else {
+        setExpanded(false);
+      }
+      flashOverlay("Mini player");
+      reveal();
       return;
     }
+
+    if (el.requestFullscreen) {
+      el.requestFullscreen().catch(() => setExpanded(true));
+    } else if (v.webkitEnterFullscreen) {
+      try {
+        v.webkitEnterFullscreen();
+      } catch {
+        setExpanded(true);
+      }
+    } else {
+      setExpanded(true);
+    }
+    flashOverlay("Fullscreen");
     reveal();
   };
 
@@ -192,6 +263,7 @@ export function VideoPlayer({
     v.playbackRate = s;
     setSpeed(s);
     setShowSpeed(false);
+    flashOverlay(`Speed ${s}x`);
     reveal();
   };
 
@@ -305,7 +377,9 @@ export function VideoPlayer({
   return (
     <div
       ref={wrapRef}
-      className="relative w-full aspect-video bg-black overflow-hidden select-none"
+      className={`bg-black overflow-hidden select-none ${
+        expanded ? "fixed inset-0 z-50 h-dvh w-screen" : "relative w-full aspect-video"
+      }`}
       onClick={reveal}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
@@ -335,38 +409,54 @@ export function VideoPlayer({
         onTouchStart={stopBubble}
         onTouchEnd={stopBubble}
         onTouchMove={stopBubble}
-        className={`absolute top-0 left-0 right-0 flex items-center justify-end gap-1 p-2 bg-gradient-to-b from-black/70 to-transparent transition-opacity ${
+        className={`absolute top-0 left-0 right-0 z-30 flex items-center justify-end gap-1 p-2 bg-gradient-to-b from-black/70 to-transparent transition-opacity ${
           showControls ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
       >
         <button
-          onClick={(e) => { stopBubble(e); toggleMute(); }}
+          onPointerDown={stopPress}
+          onPointerUp={stopAndRun("mute", toggleMute)}
+          onClick={stopAndRun("mute", toggleMute)}
           aria-label="Mute"
           className="text-primary p-2.5 active:scale-95"
         >
           {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
         </button>
         <button
-          onClick={(e) => {
-            stopBubble(e);
+          onPointerDown={stopPress}
+          onPointerUp={stopAndRun("eq", () => {
             ensureAudioGraph();
             audioCtxRef.current?.resume();
             setShowEq((s) => !s);
             setShowSpeed(false);
+            flashOverlay(showEq ? "Mixer closed" : "Mixer opened");
             reveal();
-          }}
+          })}
+          onClick={stopAndRun("eq", () => {
+            ensureAudioGraph();
+            audioCtxRef.current?.resume();
+            setShowEq((s) => !s);
+            setShowSpeed(false);
+            flashOverlay(showEq ? "Mixer closed" : "Mixer opened");
+            reveal();
+          })}
           aria-label="Equalizer"
           className="text-primary p-2.5 active:scale-95"
         >
           <Sliders className="h-5 w-5" />
         </button>
         <button
-          onClick={(e) => {
-            stopBubble(e);
+          onPointerDown={stopPress}
+          onPointerUp={stopAndRun("speed", () => {
             setShowSpeed((s) => !s);
             setShowEq(false);
             reveal();
-          }}
+          })}
+          onClick={stopAndRun("speed", () => {
+            setShowSpeed((s) => !s);
+            setShowEq(false);
+            reveal();
+          })}
           aria-label="Speed"
           className="text-primary p-2.5 flex items-center gap-1 active:scale-95"
         >
@@ -374,7 +464,9 @@ export function VideoPlayer({
           <span className="text-xs">{speed}x</span>
         </button>
         <button
-          onClick={(e) => { stopBubble(e); toggleFullscreen(); }}
+          onPointerDown={stopPress}
+          onPointerUp={stopAndRun("fullscreen", toggleFullscreen)}
+          onClick={stopAndRun("fullscreen", toggleFullscreen)}
           aria-label="Fullscreen"
           className="text-primary p-2.5 active:scale-95"
         >
@@ -384,7 +476,7 @@ export function VideoPlayer({
 
       {showSpeed && (
         <div
-          className="absolute top-14 right-3 bg-black/90 rounded-lg p-2 z-20 flex flex-col gap-1"
+          className="absolute top-14 right-3 z-40 bg-black/90 rounded-lg p-2 flex flex-col gap-1"
           onClick={stopBubble}
           onTouchStart={stopBubble}
           onTouchEnd={stopBubble}
@@ -406,7 +498,7 @@ export function VideoPlayer({
 
       {showEq && (
         <div
-          className="absolute top-14 right-3 bg-black/90 rounded-lg p-3 z-20 w-48 space-y-2"
+          className="absolute top-14 right-3 z-40 bg-black/90 rounded-lg p-3 w-48 space-y-2"
           onClick={stopBubble}
           onTouchStart={stopBubble}
           onTouchEnd={stopBubble}
@@ -433,15 +525,15 @@ export function VideoPlayer({
 
       {/* Center prev / play / next */}
       <div
-        className={`absolute inset-0 flex items-center justify-center gap-8 transition-opacity ${
-          showControls ? "opacity-100" : "opacity-0 pointer-events-none"
+        className={`pointer-events-none absolute inset-0 z-10 flex items-center justify-center gap-8 transition-opacity ${
+          showControls ? "opacity-100" : "opacity-0"
         }`}
       >
         <button
           onClick={(e) => { stopBubble(e); onPrev?.(); reveal(); }}
           onTouchStart={stopBubble}
           onTouchEnd={stopBubble}
-          className="text-primary p-2"
+          className="pointer-events-auto text-primary p-2"
           aria-label="Previous"
         >
           <SkipBack className="h-9 w-9 fill-current" />
@@ -450,7 +542,7 @@ export function VideoPlayer({
           onClick={(e) => { stopBubble(e); togglePlay(); }}
           onTouchStart={stopBubble}
           onTouchEnd={stopBubble}
-          className="text-primary p-2"
+          className="pointer-events-auto text-primary p-2"
           aria-label="Play/Pause"
         >
           {playing ? <Pause className="h-12 w-12 fill-current" /> : <Play className="h-12 w-12 fill-current" />}
@@ -459,7 +551,7 @@ export function VideoPlayer({
           onClick={(e) => { stopBubble(e); onNext?.(); reveal(); }}
           onTouchStart={stopBubble}
           onTouchEnd={stopBubble}
-          className="text-primary p-2"
+          className="pointer-events-auto text-primary p-2"
           aria-label="Next"
         >
           <SkipForward className="h-9 w-9 fill-current" />
@@ -473,7 +565,7 @@ export function VideoPlayer({
       )}
 
       <div
-        className={`absolute bottom-0 left-0 right-0 px-3 pb-2 pt-6 bg-gradient-to-t from-black/80 to-transparent transition-opacity ${
+        className={`absolute bottom-0 left-0 right-0 z-20 px-3 pb-2 pt-6 bg-gradient-to-t from-black/80 to-transparent transition-opacity ${
           showControls ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
         onClick={stopBubble}
