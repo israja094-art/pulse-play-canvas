@@ -335,7 +335,7 @@ export function VideoPlayer({
         onTouchStart={stopBubble}
         onTouchEnd={stopBubble}
         onTouchMove={stopBubble}
-        className={`absolute top-0 left-0 right-0 flex items-center justify-end gap-1 p-2 bg-gradient-to-b from-black/70 to-transparent transition-opacity ${
+        className={`absolute top-0 left-0 right-0 z-30 flex items-center justify-end gap-1 p-2 bg-gradient-to-b from-black/70 to-transparent transition-opacity ${
           showControls ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
       >
@@ -433,15 +433,15 @@ export function VideoPlayer({
 
       {/* Center prev / play / next */}
       <div
-        className={`absolute inset-0 flex items-center justify-center gap-8 transition-opacity ${
-          showControls ? "opacity-100" : "opacity-0 pointer-events-none"
+        className={`pointer-events-none absolute inset-0 z-10 flex items-center justify-center gap-8 transition-opacity ${
+          showControls ? "opacity-100" : "opacity-0"
         }`}
       >
         <button
           onClick={(e) => { stopBubble(e); onPrev?.(); reveal(); }}
           onTouchStart={stopBubble}
           onTouchEnd={stopBubble}
-          className="text-primary p-2"
+          className="pointer-events-auto text-primary p-2"
           aria-label="Previous"
         >
           <SkipBack className="h-9 w-9 fill-current" />
@@ -450,7 +450,7 @@ export function VideoPlayer({
           onClick={(e) => { stopBubble(e); togglePlay(); }}
           onTouchStart={stopBubble}
           onTouchEnd={stopBubble}
-          className="text-primary p-2"
+          className="pointer-events-auto text-primary p-2"
           aria-label="Play/Pause"
         >
           {playing ? <Pause className="h-12 w-12 fill-current" /> : <Play className="h-12 w-12 fill-current" />}
@@ -459,7 +459,7 @@ export function VideoPlayer({
           onClick={(e) => { stopBubble(e); onNext?.(); reveal(); }}
           onTouchStart={stopBubble}
           onTouchEnd={stopBubble}
-          className="text-primary p-2"
+          className="pointer-events-auto text-primary p-2"
           aria-label="Next"
         >
           <SkipForward className="h-9 w-9 fill-current" />
@@ -473,7 +473,7 @@ export function VideoPlayer({
       )}
 
       <div
-        className={`absolute bottom-0 left-0 right-0 px-3 pb-2 pt-6 bg-gradient-to-t from-black/80 to-transparent transition-opacity ${
+        className={`absolute bottom-0 left-0 right-0 z-20 px-3 pb-2 pt-6 bg-gradient-to-t from-black/80 to-transparent transition-opacity ${
           showControls ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
         onClick={stopBubble}
