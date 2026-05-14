@@ -49,6 +49,7 @@ export function VideoPlayer({
   const [brightness, setBrightness] = useState(100);
   const [volume, setVolume] = useState(1);
   const [overlay, setOverlay] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTapRef = useRef<{ t: number; x: number } | null>(null);
 
@@ -72,6 +73,31 @@ export function VideoPlayer({
       if (hideTimer.current) clearTimeout(hideTimer.current);
     };
   }, [armHide]);
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement) {
+        setExpanded(false);
+      }
+    };
+
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
+
+  useEffect(() => {
+    if (!expanded) return;
+
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = prevBodyOverflow;
+      document.documentElement.style.overflow = prevHtmlOverflow;
+    };
+  }, [expanded]);
 
   useEffect(() => {
     const v = videoRef.current;
@@ -175,13 +201,27 @@ export function VideoPlayer({
     const el = wrapRef.current;
     const v = videoRef.current as VideoEl | null;
     if (!el || !v) return;
-    if (document.fullscreenElement) {
-      document.exitFullscreen?.().catch(() => {});
-    } else if (el.requestFullscreen) {
-      el.requestFullscreen().catch(() => {});
-    } else {
-      v.webkitEnterFullscreen?.();
+
+    if (document.fullscreenElement === el || expanded) {
+      if (document.fullscreenElement === el) {
+        document.exitFullscreen?.().catch(() => setExpanded(false));
+      } else {
+        setExpanded(false);
+      }
+      reveal();
       return;
+    }
+
+    if (el.requestFullscreen) {
+      el.requestFullscreen().catch(() => setExpanded(true));
+    } else if (v.webkitEnterFullscreen) {
+      try {
+        v.webkitEnterFullscreen();
+      } catch {
+        setExpanded(true);
+      }
+    } else {
+      setExpanded(true);
     }
     reveal();
   };
@@ -305,7 +345,9 @@ export function VideoPlayer({
   return (
     <div
       ref={wrapRef}
-      className="relative w-full aspect-video bg-black overflow-hidden select-none"
+      className={`bg-black overflow-hidden select-none ${
+        expanded ? "fixed inset-0 z-50 h-dvh w-screen" : "relative w-full aspect-video"
+      }`}
       onClick={reveal}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
@@ -384,7 +426,7 @@ export function VideoPlayer({
 
       {showSpeed && (
         <div
-          className="absolute top-14 right-3 bg-black/90 rounded-lg p-2 z-20 flex flex-col gap-1"
+          className="absolute top-14 right-3 z-40 bg-black/90 rounded-lg p-2 flex flex-col gap-1"
           onClick={stopBubble}
           onTouchStart={stopBubble}
           onTouchEnd={stopBubble}
@@ -406,7 +448,7 @@ export function VideoPlayer({
 
       {showEq && (
         <div
-          className="absolute top-14 right-3 bg-black/90 rounded-lg p-3 z-20 w-48 space-y-2"
+          className="absolute top-14 right-3 z-40 bg-black/90 rounded-lg p-3 w-48 space-y-2"
           onClick={stopBubble}
           onTouchStart={stopBubble}
           onTouchEnd={stopBubble}
