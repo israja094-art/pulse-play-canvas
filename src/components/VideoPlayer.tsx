@@ -52,6 +52,34 @@ export function VideoPlayer({
   const [expanded, setExpanded] = useState(false);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTapRef = useRef<{ t: number; x: number } | null>(null);
+  const lastActionRef = useRef<{ key: string; at: number } | null>(null);
+
+  const flashOverlay = useCallback((text: string, ms = 900) => {
+    setOverlay(text);
+    window.setTimeout(() => setOverlay(null), ms);
+  }, []);
+
+  const runButtonAction = useCallback((key: string, fn: () => void) => {
+    const now = Date.now();
+    if (lastActionRef.current?.key === key && now - lastActionRef.current.at < 250) return;
+    lastActionRef.current = { key, at: now };
+    fn();
+  }, []);
+
+  const stopAndRun = useCallback(
+    (key: string, fn: () => void) =>
+      (e: React.SyntheticEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        runButtonAction(key, fn);
+      },
+    [runButtonAction],
+  );
+
+  const stopPress = useCallback((e: React.SyntheticEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
 
   const armHide = useCallback(() => {
     if (hideTimer.current) clearTimeout(hideTimer.current);
@@ -194,6 +222,7 @@ export function VideoPlayer({
       setVolume(1);
     }
     setMuted(v.muted);
+    flashOverlay(v.muted ? "Muted" : `Volume ${Math.round(v.volume * 100)}%`);
     reveal();
   };
 
@@ -208,6 +237,7 @@ export function VideoPlayer({
       } else {
         setExpanded(false);
       }
+      flashOverlay("Mini player");
       reveal();
       return;
     }
@@ -223,6 +253,7 @@ export function VideoPlayer({
     } else {
       setExpanded(true);
     }
+    flashOverlay("Fullscreen");
     reveal();
   };
 
@@ -232,6 +263,7 @@ export function VideoPlayer({
     v.playbackRate = s;
     setSpeed(s);
     setShowSpeed(false);
+    flashOverlay(`Speed ${s}x`);
     reveal();
   };
 
@@ -382,33 +414,49 @@ export function VideoPlayer({
         }`}
       >
         <button
-          onClick={(e) => { stopBubble(e); toggleMute(); }}
+          onPointerDown={stopPress}
+          onPointerUp={stopAndRun("mute", toggleMute)}
+          onClick={stopAndRun("mute", toggleMute)}
           aria-label="Mute"
           className="text-primary p-2.5 active:scale-95"
         >
           {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
         </button>
         <button
-          onClick={(e) => {
-            stopBubble(e);
+          onPointerDown={stopPress}
+          onPointerUp={stopAndRun("eq", () => {
             ensureAudioGraph();
             audioCtxRef.current?.resume();
             setShowEq((s) => !s);
             setShowSpeed(false);
+            flashOverlay(showEq ? "Mixer closed" : "Mixer opened");
             reveal();
-          }}
+          })}
+          onClick={stopAndRun("eq", () => {
+            ensureAudioGraph();
+            audioCtxRef.current?.resume();
+            setShowEq((s) => !s);
+            setShowSpeed(false);
+            flashOverlay(showEq ? "Mixer closed" : "Mixer opened");
+            reveal();
+          })}
           aria-label="Equalizer"
           className="text-primary p-2.5 active:scale-95"
         >
           <Sliders className="h-5 w-5" />
         </button>
         <button
-          onClick={(e) => {
-            stopBubble(e);
+          onPointerDown={stopPress}
+          onPointerUp={stopAndRun("speed", () => {
             setShowSpeed((s) => !s);
             setShowEq(false);
             reveal();
-          }}
+          })}
+          onClick={stopAndRun("speed", () => {
+            setShowSpeed((s) => !s);
+            setShowEq(false);
+            reveal();
+          })}
           aria-label="Speed"
           className="text-primary p-2.5 flex items-center gap-1 active:scale-95"
         >
@@ -416,7 +464,9 @@ export function VideoPlayer({
           <span className="text-xs">{speed}x</span>
         </button>
         <button
-          onClick={(e) => { stopBubble(e); toggleFullscreen(); }}
+          onPointerDown={stopPress}
+          onPointerUp={stopAndRun("fullscreen", toggleFullscreen)}
+          onClick={stopAndRun("fullscreen", toggleFullscreen)}
           aria-label="Fullscreen"
           className="text-primary p-2.5 active:scale-95"
         >
