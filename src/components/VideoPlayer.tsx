@@ -21,13 +21,11 @@ type VideoEl = HTMLVideoElement & {
 
 export function VideoPlayer({
   src,
-  poster,
   onEnded,
   onPrev,
   onNext,
 }: {
   src: string;
-  poster?: string;
   onEnded?: () => void;
   onPrev?: () => void;
   onNext?: () => void;
@@ -389,7 +387,6 @@ export function VideoPlayer({
       <video
         ref={videoRef}
         src={src}
-        poster={poster}
         className="w-full h-full object-contain bg-black"
         playsInline
         autoPlay
