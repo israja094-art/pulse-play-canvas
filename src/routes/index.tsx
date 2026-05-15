@@ -173,7 +173,7 @@ function VideoRow({
   onToggle,
   onLongPress,
 }: {
-  video: { id: string; title: string; thumb: string; duration: string };
+  video: { id: string; title: string; duration: string };
   selectMode: boolean;
   selected: boolean;
   onOpen: () => void;
@@ -203,11 +203,11 @@ function VideoRow({
             )}
           </div>
         )}
-        <div className="relative w-32 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-muted">
-          <img src={video.thumb} alt={video.title} className="w-full h-full object-cover" loading="lazy" />
-          <span className="absolute bottom-1 right-1 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded">
-            {video.duration}
-          </span>
+        <div className="w-32 h-20 rounded-lg flex-shrink-0 bg-secondary/70 border border-border/60 flex flex-col items-center justify-center gap-1">
+          <div className="h-9 w-9 rounded-full bg-primary/15 flex items-center justify-center">
+            <CheckCircle2 className="h-4 w-4 text-primary" />
+          </div>
+          <span className="text-[10px] text-muted-foreground">{video.duration}</span>
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm text-foreground line-clamp-2 font-medium">{video.title}</p>
