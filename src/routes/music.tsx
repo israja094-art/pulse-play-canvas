@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Outlet, createFileRoute, useLocation, useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { CheckCircle2, Circle, FolderPlus, Share2, Trash2, X } from "lucide-react";
 import { BottomTabs } from "@/components/BottomTabs";
@@ -24,12 +24,17 @@ export const Route = createFileRoute("/music")({
 });
 
 function MusicPage() {
+  const { pathname } = useLocation();
   const { songs } = useMediaStore();
   const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const fileRef = useRef<HTMLInputElement>(null);
+
+  if (pathname !== "/music") {
+    return <Outlet />;
+  }
 
   const list = songs.filter(
     (s) =>
