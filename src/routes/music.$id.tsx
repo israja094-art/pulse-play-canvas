@@ -53,6 +53,22 @@ function NowPlaying() {
     tryPlay();
   }, [id, song]);
 
+  const closePlayer = () => {
+    const a = audioRef.current;
+    if (a) {
+      a.pause();
+      a.currentTime = 0;
+    }
+    navigate({ to: "/music" });
+  };
+
+  useEffect(() => {
+    return () => {
+      const a = audioRef.current;
+      if (a) a.pause();
+    };
+  }, []);
+
   useEffect(() => {
     const a = audioRef.current;
     if (!a) return;
