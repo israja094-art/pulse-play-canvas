@@ -83,10 +83,8 @@ function NowPlaying() {
         a.play().catch(() => {});
         return;
       }
-      const ni = shuffle
-        ? Math.floor(Math.random() * Math.max(1, songs.length))
-        : (idx + 1) % Math.max(1, songs.length);
-      if (songs[ni]) navigate({ to: "/music/$id", params: { id: songs[ni].id } });
+      setPlaying(false);
+      setCurrent(a.duration || 0);
     };
     a.addEventListener("timeupdate", onTime);
     a.addEventListener("loadedmetadata", onMeta);
@@ -100,7 +98,7 @@ function NowPlaying() {
       a.removeEventListener("pause", onPause);
       a.removeEventListener("ended", onEnd);
     };
-  }, [repeat, shuffle, idx, songs, navigate]);
+  }, [repeat]);
 
   if (!song) {
     return (
@@ -154,8 +152,8 @@ function NowPlaying() {
           <ChevronDown className="h-6 w-6 text-primary" />
         </button>
         <div className="text-center">
-          <p className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">Playing now</p>
-          <p className="text-sm font-semibold text-foreground">ZabPlay Music</p>
+          <p className="text-sm font-semibold text-foreground truncate max-w-[10rem]">{song.title}</p>
+          <p className="text-[11px] text-muted-foreground">{song.artist}</p>
         </div>
         <button
           aria-label="More"
