@@ -29,6 +29,12 @@ let hydratedFromStorage = false;
 
 const userVideos: Video[] = [];
 const userSongs: Song[] = [];
+const VIDEO_THUMB_PLACEHOLDER =
+  "data:image/svg+xml;charset=UTF-8," +
+  encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180"><rect width="320" height="180" rx="18" fill="#111827"/><circle cx="160" cy="90" r="32" fill="#ffffff22"/><path d="M148 70v40l30-20-30-20z" fill="#f8fafc"/></svg>`);
+const SONG_COVER_PLACEHOLDER =
+  "data:image/svg+xml;charset=UTF-8," +
+  encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300"><rect width="300" height="300" rx="28" fill="#111827"/><circle cx="150" cy="150" r="82" fill="#ffffff14"/><circle cx="150" cy="150" r="22" fill="#f8fafc"/><path d="M178 84v90.5a25 25 0 1 1-14-22.5V108l58-11v63.5a25 25 0 1 1-14-22.5V84z" fill="#cbd5e1"/></svg>`);
 
 const computeState = (): State => ({
   videos: [...userVideos, ...defaultVideos.filter((v) => !deletedV.has(v.id))],
@@ -131,6 +137,22 @@ const probeVideo = (url: string): Promise<{ duration: string; thumb: string }> =
     setTimeout(() => done(fmtDuration(v.duration || 0), ""), 4000);
   });
 
+const probeAudioDuration = (url: string): Promise<string> =>
+  new Promise((resolve) => {
+    const audio = document.createElement("audio");
+    audio.preload = "metadata";
+    audio.src = url;
+    let settled = false;
+    const finish = (value: string) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    audio.addEventListener("loadedmetadata", () => finish(fmtDuration(audio.duration || 0)));
+    audio.addEventListener("error", () => finish("00:00"));
+    setTimeout(() => finish(fmtDuration(audio.duration || 0)), 4000);
+  });
+
 export const importVideoFiles = async (files: FileList | File[]) => {
   const arr = Array.from(files);
   for (const f of arr) {
@@ -140,7 +162,7 @@ export const importVideoFiles = async (files: FileList | File[]) => {
       id: `u-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       title: f.name.replace(/\.[^.]+$/, ""),
       duration,
-      thumb: thumb || "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&h=240&fit=crop",
+      thumb: thumb || VIDEO_THUMB_PLACEHOLDER,
       src: url,
     });
     emit();
@@ -151,11 +173,12 @@ export const importAudioFiles = async (files: FileList | File[]) => {
   const arr = Array.from(files);
   for (const f of arr) {
     const url = URL.createObjectURL(f);
+    const duration = await probeAudioDuration(url);
     userSongs.unshift({
       id: `u-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       title: f.name.replace(/\.[^.]+$/, ""),
-      artist: "Local file",
-      cover: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=200&h=200&fit=crop",
+      artist: duration,
+      cover: SONG_COVER_PLACEHOLDER,
       src: url,
     });
     emit();
