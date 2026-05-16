@@ -9,6 +9,8 @@ import {
   VolumeX,
   Gauge,
   Sliders,
+  Repeat,
+  ZoomIn,
 } from "lucide-react";
 import { formatTime } from "@/lib/media-data";
 
@@ -48,9 +50,12 @@ export function VideoPlayer({
   const [volume, setVolume] = useState(1);
   const [overlay, setOverlay] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [looping, setLooping] = useState(false);
+  const [zoom, setZoom] = useState(1);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTapRef = useRef<{ t: number; x: number } | null>(null);
   const lastActionRef = useRef<{ key: string; at: number } | null>(null);
+  const pinchRef = useRef<{ distance: number; startZoom: number } | null>(null);
 
   const flashOverlay = useCallback((text: string, ms = 900) => {
     setOverlay(text);
@@ -64,20 +69,11 @@ export function VideoPlayer({
     fn();
   }, []);
 
-  const stopAndRun = useCallback(
-    (key: string, fn: () => void) =>
-      (e: React.SyntheticEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        runButtonAction(key, fn);
-      },
-    [runButtonAction],
-  );
-
-  const stopPress = useCallback((e: React.SyntheticEvent) => {
+  const stopAndRun = useCallback((key: string, fn: () => void) => (e: React.SyntheticEvent) => {
     e.preventDefault();
     e.stopPropagation();
-  }, []);
+    runButtonAction(key, fn);
+  }, [runButtonAction]);
 
   const armHide = useCallback(() => {
     if (hideTimer.current) clearTimeout(hideTimer.current);
@@ -126,12 +122,38 @@ export function VideoPlayer({
   }, [expanded]);
 
   useEffect(() => {
+    setPlaying(false);
+    setCurrent(0);
+    setDuration(0);
+    setMuted(false);
+    setVolume(1);
+    setSpeed(1);
+    setShowEq(false);
+    setShowSpeed(false);
+    setZoom(1);
+    const v = videoRef.current;
+    if (!v) return;
+    v.currentTime = 0;
+    v.playbackRate = 1;
+    v.muted = false;
+    v.volume = 1;
+    v.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+  }, [src]);
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.loop = looping;
+  }, [looping]);
+
+  useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
     const onTime = () => setCurrent(v.currentTime);
     const onMeta = () => setDuration(v.duration);
     const onEnd = () => {
       setPlaying(false);
+      if (looping) return;
       onEnded?.();
     };
     v.addEventListener("timeupdate", onTime);
@@ -142,7 +164,7 @@ export function VideoPlayer({
       v.removeEventListener("loadedmetadata", onMeta);
       v.removeEventListener("ended", onEnd);
     };
-  }, [onEnded]);
+  }, [looping, onEnded]);
 
   const ensureAudioGraph = useCallback(() => {
     const v = videoRef.current;
@@ -240,8 +262,17 @@ export function VideoPlayer({
       return;
     }
 
+    const lockLandscape = async () => {
+      try {
+        const orientationApi = screen.orientation as ScreenOrientation & { lock?: (orientation: string) => Promise<void> };
+        await orientationApi.lock?.("landscape");
+      } catch {
+        /* ignore */
+      }
+    };
+
     if (el.requestFullscreen) {
-      el.requestFullscreen().catch(() => setExpanded(true));
+      el.requestFullscreen().then(lockLandscape).catch(() => setExpanded(true));
     } else if (v.webkitEnterFullscreen) {
       try {
         v.webkitEnterFullscreen();
@@ -252,6 +283,24 @@ export function VideoPlayer({
       setExpanded(true);
     }
     flashOverlay("Fullscreen");
+    reveal();
+  };
+
+  const cycleZoom = () => {
+    const levels = [1, 1.25, 1.5, 2];
+    const currentIndex = levels.findIndex((level) => Math.abs(level - zoom) < 0.01);
+    const next = levels[(currentIndex + 1) % levels.length];
+    setZoom(next);
+    flashOverlay(`Zoom ${Math.round(next * 100)}%`);
+    reveal();
+  };
+
+  const toggleLoop = () => {
+    setLooping((prev) => {
+      const next = !prev;
+      flashOverlay(next ? "Loop on" : "Loop off");
+      return next;
+    });
     reveal();
   };
 
@@ -293,6 +342,20 @@ export function VideoPlayer({
   };
 
   const onTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const [a, b] = [e.touches[0], e.touches[1]];
+      const distance = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      if (!pinchRef.current) {
+        pinchRef.current = { distance, startZoom: zoom };
+      } else {
+        const next = Math.max(1, Math.min(3, pinchRef.current.startZoom * (distance / pinchRef.current.distance)));
+        setZoom(next);
+        setOverlay(`Zoom ${Math.round(next * 100)}%`);
+      }
+      setShowControls(true);
+      return;
+    }
+
     const g = gesture.current;
     if (!g) return;
     const t = e.touches[0];
@@ -329,6 +392,13 @@ export function VideoPlayer({
   };
 
   const onTouchEnd = (e: React.TouchEvent) => {
+    if (pinchRef.current) {
+      pinchRef.current = null;
+      setTimeout(() => setOverlay(null), 600);
+      armHide();
+      return;
+    }
+
     const g = gesture.current;
     if (g && g.mode === "h") {
       const v = videoRef.current;
@@ -387,10 +457,12 @@ export function VideoPlayer({
       <video
         ref={videoRef}
         src={src}
-        className="w-full h-full object-contain bg-black"
+        className="w-full h-full object-contain bg-black transition-transform duration-150"
         playsInline
         autoPlay
         muted={muted}
+        loop={looping}
+        style={{ transform: `scale(${zoom})` }}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onVolumeChange={() => {
@@ -411,17 +483,15 @@ export function VideoPlayer({
         }`}
       >
         <button
-          onPointerDown={stopPress}
-          onPointerUp={stopAndRun("mute", toggleMute)}
           onClick={stopAndRun("mute", toggleMute)}
+          onTouchEnd={stopAndRun("mute", toggleMute)}
           aria-label="Mute"
           className="text-primary p-2.5 active:scale-95"
         >
           {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
         </button>
         <button
-          onPointerDown={stopPress}
-          onPointerUp={stopAndRun("eq", () => {
+          onClick={stopAndRun("eq", () => {
             ensureAudioGraph();
             audioCtxRef.current?.resume();
             setShowEq((s) => !s);
@@ -429,7 +499,7 @@ export function VideoPlayer({
             flashOverlay(showEq ? "Mixer closed" : "Mixer opened");
             reveal();
           })}
-          onClick={stopAndRun("eq", () => {
+          onTouchEnd={stopAndRun("eq", () => {
             ensureAudioGraph();
             audioCtxRef.current?.resume();
             setShowEq((s) => !s);
@@ -443,13 +513,12 @@ export function VideoPlayer({
           <Sliders className="h-5 w-5" />
         </button>
         <button
-          onPointerDown={stopPress}
-          onPointerUp={stopAndRun("speed", () => {
+          onClick={stopAndRun("speed", () => {
             setShowSpeed((s) => !s);
             setShowEq(false);
             reveal();
           })}
-          onClick={stopAndRun("speed", () => {
+          onTouchEnd={stopAndRun("speed", () => {
             setShowSpeed((s) => !s);
             setShowEq(false);
             reveal();
@@ -461,13 +530,29 @@ export function VideoPlayer({
           <span className="text-xs">{speed}x</span>
         </button>
         <button
-          onPointerDown={stopPress}
-          onPointerUp={stopAndRun("fullscreen", toggleFullscreen)}
           onClick={stopAndRun("fullscreen", toggleFullscreen)}
+          onTouchEnd={stopAndRun("fullscreen", toggleFullscreen)}
           aria-label="Fullscreen"
           className="text-primary p-2.5 active:scale-95"
         >
           <Maximize className="h-5 w-5" />
+        </button>
+        <button
+          onClick={stopAndRun("loop", toggleLoop)}
+          onTouchEnd={stopAndRun("loop", toggleLoop)}
+          aria-label="Loop"
+          className={`p-2.5 active:scale-95 ${looping ? "text-primary" : "text-muted-foreground"}`}
+        >
+          <Repeat className="h-5 w-5" />
+        </button>
+        <button
+          onClick={stopAndRun("zoom", cycleZoom)}
+          onTouchEnd={stopAndRun("zoom", cycleZoom)}
+          aria-label="Zoom"
+          className="text-primary p-2.5 active:scale-95 flex items-center gap-1"
+        >
+          <ZoomIn className="h-5 w-5" />
+          <span className="text-xs">{Math.round(zoom * 100)}%</span>
         </button>
       </div>
 
