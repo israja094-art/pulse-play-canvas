@@ -146,7 +146,7 @@ function NowPlaying() {
 
       <header className="relative z-10 flex items-center justify-between px-4 pt-4 pb-3">
         <button
-          onClick={() => navigate({ to: "/music" })}
+          onClick={closePlayer}
           aria-label="Close"
           className="flex h-11 w-11 items-center justify-center rounded-full border border-border/60 bg-background/55 backdrop-blur"
         >
