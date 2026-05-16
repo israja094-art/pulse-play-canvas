@@ -177,8 +177,9 @@ export const importAudioFiles = async (files: FileList | File[]) => {
     userSongs.unshift({
       id: `u-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       title: f.name.replace(/\.[^.]+$/, ""),
-      artist: duration,
+      artist: "Local audio",
       cover: SONG_COVER_PLACEHOLDER,
+      duration,
       src: url,
     });
     emit();
