@@ -45,7 +45,6 @@ function VideoPage() {
         <div className="relative">
           <VideoPlayer
             src={current.src}
-            onEnded={() => goTo(idx + 1)}
             onPrev={() => goTo(idx - 1)}
             onNext={() => goTo(idx + 1)}
           />
@@ -75,9 +74,12 @@ function VideoPage() {
                   onClick={() => navigate({ to: "/video/$id", params: { id: v.id } })}
                   className="flex flex-1 items-center gap-3 min-w-0 text-left"
                 >
-                <div className="w-24 h-14 rounded-md flex-shrink-0 bg-secondary/70 border border-border/60 flex items-center justify-center">
-                  <Play className="h-5 w-5 text-primary" />
-                </div>
+                  <img
+                    src={v.thumb}
+                    alt={v.title}
+                    className="h-14 w-24 rounded-md border border-border/60 object-cover flex-shrink-0 bg-secondary/70"
+                    loading="lazy"
+                  />
                 <p
                   className={`flex-1 text-sm line-clamp-2 ${
                     active ? "text-primary font-medium" : "text-foreground"
