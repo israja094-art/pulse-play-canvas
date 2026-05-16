@@ -122,6 +122,25 @@ export function VideoPlayer({
   }, [expanded]);
 
   useEffect(() => {
+    setPlaying(false);
+    setCurrent(0);
+    setDuration(0);
+    setMuted(false);
+    setVolume(1);
+    setSpeed(1);
+    setShowEq(false);
+    setShowSpeed(false);
+    setZoom(1);
+    const v = videoRef.current;
+    if (!v) return;
+    v.currentTime = 0;
+    v.playbackRate = 1;
+    v.muted = false;
+    v.volume = 1;
+    v.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+  }, [src]);
+
+  useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
     v.loop = looping;
@@ -443,6 +462,7 @@ export function VideoPlayer({
         autoPlay
         muted={muted}
         loop={looping}
+        style={{ transform: `scale(${zoom})` }}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onVolumeChange={() => {
@@ -452,8 +472,6 @@ export function VideoPlayer({
           setVolume(v.volume);
         }}
       />
-
-      <div className="pointer-events-none absolute inset-0" style={{ transform: `scale(${zoom})` }} />
 
       {/* Top bar icons */}
       <div
