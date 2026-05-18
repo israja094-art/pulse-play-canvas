@@ -125,10 +125,11 @@ export const runNativeScan = async (force = false): Promise<void> => {
   if (!force && Date.now() - lastScan < 5000) return;
   scanning = true;
   try {
-    const [{ Filesystem, Directory }, { Capacitor }] = await Promise.all([
-      import("@capacitor/filesystem"),
-      import("@capacitor/core"),
-    ]);
+    const fsMod: any = await import(/* @vite-ignore */ "@capacitor/filesystem" as string);
+    const coreMod: any = await import(/* @vite-ignore */ "@capacitor/core" as string);
+    const Filesystem = fsMod.Filesystem;
+    const Directory = fsMod.Directory;
+    const Capacitor = coreMod.Capacitor;
 
     try {
       const perm = await Filesystem.checkPermissions();
@@ -166,7 +167,8 @@ export const wireAutoRescan = async () => {
   if (appResumeWired || !isCapacitorNative()) return;
   appResumeWired = true;
   try {
-    const { App } = await import("@capacitor/app");
+    const appMod: any = await import(/* @vite-ignore */ "@capacitor/app" as string);
+    const App = appMod.App;
     App.addListener("appStateChange", (state: { isActive: boolean }) => {
       if (state.isActive) void runNativeScan(true);
     });
