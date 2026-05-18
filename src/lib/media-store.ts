@@ -178,6 +178,9 @@ const subscribe = (l: () => void) => {
     deletedS = loadDeleted(LS_DELETED_S);
     queueMicrotask(() => emit());
     void hydratePersistedMedia();
+    subscribeNativeMedia(() => emit());
+    void runNativeScan(true);
+    void wireAutoRescan();
   }
   listeners.add(l);
   return () => listeners.delete(l);
