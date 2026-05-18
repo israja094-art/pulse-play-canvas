@@ -37,8 +37,8 @@ jobs:
       - name: Install web dependencies
         run: bun install
 
-      - name: Install Capacitor
-        run: bun add -d @capacitor/core@^6 @capacitor/cli@^6 @capacitor/android@^6
+      - name: Install Capacitor + plugins
+        run: bun add -d @capacitor/core@^6 @capacitor/cli@^6 @capacitor/android@^6 @capacitor/filesystem@^6 @capacitor/app@^6
 
       - name: Build web (SPA) → www/
         run: bunx vite build --config vite.mobile.config.ts
@@ -51,6 +51,15 @@ jobs:
 
       - name: Capacitor sync
         run: bunx cap sync android
+
+      - name: Patch AndroidManifest with media permissions
+        run: |
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+          # Insert permissions just after the opening <manifest> tag (only if missing)
+          if ! grep -q "READ_MEDIA_VIDEO" "$MANIFEST"; then
+            sed -i 's|<manifest |<manifest |; /<manifest /a\    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>\n    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>\n    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>\n    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>' "$MANIFEST"
+          fi
+          cat "$MANIFEST"
 
       - name: Build debug APK
         working-directory: android
