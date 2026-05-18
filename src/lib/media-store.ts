@@ -1,5 +1,12 @@
 import { useSyncExternalStore } from "react";
 import { videos as defaultVideos, songs as defaultSongs, type Video, type Song } from "./media-data";
+import {
+  subscribeNativeMedia,
+  getNativeVideos,
+  getNativeSongs,
+  runNativeScan,
+  wireAutoRescan,
+} from "./native-scanner";
 
 type State = {
   videos: Video[];
@@ -59,10 +66,14 @@ let mediaHydrated = false;
 const userVideos: Video[] = [];
 const userSongs: Song[] = [];
 
-const computeState = (): State => ({
-  videos: [...userVideos, ...defaultVideos.filter((v) => !deletedV.has(v.id))],
-  songs: [...userSongs, ...defaultSongs.filter((s) => !deletedS.has(s.id))],
-});
+const computeState = (): State => {
+  const nv = getNativeVideos();
+  const ns = getNativeSongs();
+  return {
+    videos: [...nv, ...userVideos, ...defaultVideos.filter((v) => !deletedV.has(v.id))],
+    songs: [...ns, ...userSongs, ...defaultSongs.filter((s) => !deletedS.has(s.id))],
+  };
+};
 
 let state: State = computeState();
 const listeners = new Set<() => void>();
