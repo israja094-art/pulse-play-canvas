@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
-import { CheckCircle2, Circle, FolderPlus, Share2, Trash2, X } from "lucide-react";
+import { CheckCircle2, Circle, Share2, Trash2, X } from "lucide-react";
 import { BottomTabs } from "@/components/BottomTabs";
 import { SearchBar } from "@/components/SearchBar";
 import { Logo } from "@/components/Logo";
