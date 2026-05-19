@@ -100,13 +100,7 @@ function MusicPage() {
           <div className="flex items-center justify-between">
             <Logo />
             <div className="flex items-center gap-1 -mr-2">
-              <button
-                onClick={() => fileRef.current?.click()}
-                className="p-2 text-foreground/80"
-                aria-label="Import from gallery"
-              >
-                <FolderPlus className="h-5 w-5" />
-              </button>
+
               <button
                 onClick={() => shareItems(songs.slice(0, 5).map((s) => ({ title: s.title, src: s.src })))}
                 className="p-2 text-foreground/80"
