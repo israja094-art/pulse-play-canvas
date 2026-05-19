@@ -106,6 +106,8 @@ export function VideoPlayer({
     const onFullscreenChange = () => {
       if (!document.fullscreenElement) {
         setExpanded(false);
+        void unlockOrientation();
+        void showSystemUi();
       }
     };
 
