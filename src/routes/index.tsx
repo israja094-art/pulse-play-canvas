@@ -135,9 +135,9 @@ function Index() {
 
       {list.length === 0 ? (
         <div className="px-6 py-16 text-center text-muted-foreground text-sm">
-          No videos yet. Tap{" "}
-          <FolderPlus className="inline h-4 w-4 align-text-bottom" /> to add from your gallery.
+          No videos found yet. They'll appear here automatically from your gallery once permission is granted.
         </div>
+
       ) : (
         <ul className="px-3 pt-3 space-y-2">
           {list.map((v) => (
