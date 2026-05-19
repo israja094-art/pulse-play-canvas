@@ -23,7 +23,7 @@ function Index() {
   const [q, setQ] = useState("");
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const fileRef = useRef<HTMLInputElement>(null);
+  
 
   const list = videos.filter((v) => v.title.toLowerCase().includes(q.toLowerCase()));
 
