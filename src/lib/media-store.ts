@@ -7,6 +7,7 @@ import {
   runNativeScan,
   wireAutoRescan,
 } from "./native-scanner";
+import { nativeShare, nativeDeleteFile } from "./native-ui";
 
 type State = {
   videos: Video[];
@@ -195,6 +196,11 @@ export const useMediaStore = () =>
 
 export const deleteVideos = (ids: string[]) => {
   for (const id of ids) {
+    if (id.startsWith("nv-")) {
+      const uri = id.slice(3);
+      void nativeDeleteFile(uri).then(() => void runNativeScan(true));
+      continue;
+    }
     const i = userVideos.findIndex((v) => v.id === id);
     if (i >= 0) {
       URL.revokeObjectURL(userVideos[i].src);
@@ -210,6 +216,11 @@ export const deleteVideos = (ids: string[]) => {
 
 export const deleteSongs = (ids: string[]) => {
   for (const id of ids) {
+    if (id.startsWith("ns-")) {
+      const uri = id.slice(3);
+      void nativeDeleteFile(uri).then(() => void runNativeScan(true));
+      continue;
+    }
     const i = userSongs.findIndex((s) => s.id === id);
     if (i >= 0) {
       URL.revokeObjectURL(userSongs[i].src);
@@ -336,20 +347,8 @@ export const importAudioFiles = async (files: FileList | File[]) => {
 
 export const shareItems = async (items: { title: string; src: string }[]) => {
   if (items.length === 0) return;
+  const single = items.length === 1 ? items[0] : null;
+  const title = single ? single.title : "ZabPlay";
   const text = items.map((i) => `${i.title}\n${i.src}`).join("\n\n");
-  const navAny = navigator as Navigator & { share?: (d: ShareData) => Promise<void> };
-  if (navAny.share) {
-    try {
-      await navAny.share({ title: "ZabPlay", text });
-      return;
-    } catch {
-      /* fallback */
-    }
-  }
-  try {
-    await navigator.clipboard.writeText(text);
-    alert("Copied to clipboard");
-  } catch {
-    alert(text);
-  }
+  await nativeShare(title, text, single?.src);
 };
