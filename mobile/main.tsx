@@ -9,6 +9,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { routeTree } from "../src/routeTree.gen";
 import "../src/styles.css";
+import { initImmersive } from "../src/lib/native-ui";
+import { PermissionGate } from "../src/components/PermissionGate";
 
 const queryClient = new QueryClient();
 
@@ -26,9 +28,13 @@ declare module "@tanstack/react-router" {
   }
 }
 
+// Hide Android system bars after launch; tap restores them for 3s.
+initImmersive();
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
+      <PermissionGate />
       <RouterProvider router={router} />
     </QueryClientProvider>
   </StrictMode>,
