@@ -13,6 +13,12 @@ import {
   ZoomIn,
 } from "lucide-react";
 import { formatTime } from "@/lib/media-data";
+import {
+  lockOrientation,
+  unlockOrientation,
+  hideSystemUi,
+  showSystemUi,
+} from "@/lib/native-ui";
 
 const SPEEDS = [0.5, 1, 1.25, 1.5, 2];
 
@@ -251,37 +257,36 @@ export function VideoPlayer({
     const v = videoRef.current as VideoEl | null;
     if (!el || !v) return;
 
-    if (document.fullscreenElement === el || expanded) {
+    const exiting = document.fullscreenElement === el || expanded;
+    if (exiting) {
       if (document.fullscreenElement === el) {
         document.exitFullscreen?.().catch(() => setExpanded(false));
       } else {
         setExpanded(false);
       }
+      void unlockOrientation();
+      void showSystemUi();
       flashOverlay("Mini player");
       reveal();
       return;
     }
 
-    const lockLandscape = async () => {
-      try {
-        const orientationApi = screen.orientation as ScreenOrientation & { lock?: (orientation: string) => Promise<void> };
-        await orientationApi.lock?.("landscape");
-      } catch {
-        /* ignore */
-      }
-    };
-
     if (el.requestFullscreen) {
-      el.requestFullscreen().then(lockLandscape).catch(() => setExpanded(true));
+      el.requestFullscreen()
+        .then(() => lockOrientation("landscape"))
+        .catch(() => setExpanded(true));
     } else if (v.webkitEnterFullscreen) {
       try {
         v.webkitEnterFullscreen();
       } catch {
         setExpanded(true);
       }
+      void lockOrientation("landscape");
     } else {
       setExpanded(true);
+      void lockOrientation("landscape");
     }
+    void hideSystemUi();
     flashOverlay("Fullscreen");
     reveal();
   };
