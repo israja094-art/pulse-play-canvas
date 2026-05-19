@@ -25,7 +25,7 @@ function MusicPage() {
   const [q, setQ] = useState("");
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const fileRef = useRef<HTMLInputElement>(null);
+  
 
   if (pathname !== "/music") {
     return <Outlet />;
