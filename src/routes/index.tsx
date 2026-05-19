@@ -1,16 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useRef, useState } from "react";
-import { CheckCircle2, Circle, FolderPlus, Share2, Trash2, X } from "lucide-react";
+import { useState } from "react";
+import { CheckCircle2, Circle, Share2, Trash2, X } from "lucide-react";
 import { BottomTabs } from "@/components/BottomTabs";
 import { SearchBar } from "@/components/SearchBar";
 import { Logo } from "@/components/Logo";
 import { useLongPress } from "@/hooks/use-long-press";
-import {
-  useMediaStore,
-  importVideoFiles,
-  deleteVideos,
-  shareItems,
-} from "@/lib/media-store";
+import { useMediaStore, deleteVideos, shareItems } from "@/lib/media-store";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -28,7 +23,7 @@ function Index() {
   const [q, setQ] = useState("");
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const fileRef = useRef<HTMLInputElement>(null);
+  
 
   const list = videos.filter((v) => v.title.toLowerCase().includes(q.toLowerCase()));
 
@@ -69,17 +64,7 @@ function Index() {
 
   return (
     <div className="min-h-screen bg-background mx-auto max-w-md pb-20">
-      <input
-        ref={fileRef}
-        type="file"
-        accept="video/*"
-        multiple
-        className="hidden"
-        onChange={(e) => {
-          if (e.target.files) importVideoFiles(e.target.files);
-          e.target.value = "";
-        }}
-      />
+
 
       <div className="px-4 pt-5 pb-3 space-y-4 sticky top-0 bg-background/95 backdrop-blur z-30 border-b border-border/50">
         {selectMode ? (
@@ -109,13 +94,7 @@ function Index() {
           <div className="flex items-center justify-between">
             <Logo />
             <div className="flex items-center gap-1 -mr-2">
-              <button
-                onClick={() => fileRef.current?.click()}
-                className="p-2 text-foreground/80"
-                aria-label="Import from gallery"
-              >
-                <FolderPlus className="h-5 w-5" />
-              </button>
+
               <button
                 onClick={() => {
                   const items = videos.map((v) => ({ title: v.title, src: v.src }));
@@ -141,9 +120,9 @@ function Index() {
 
       {list.length === 0 ? (
         <div className="px-6 py-16 text-center text-muted-foreground text-sm">
-          No videos yet. Tap{" "}
-          <FolderPlus className="inline h-4 w-4 align-text-bottom" /> to add from your gallery.
+          No videos found yet. They'll appear here automatically from your gallery once permission is granted.
         </div>
+
       ) : (
         <ul className="px-3 pt-3 space-y-2">
           {list.map((v) => (

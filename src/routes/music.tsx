@@ -1,17 +1,12 @@
 import { Outlet, createFileRoute, useLocation, useNavigate } from "@tanstack/react-router";
-import { useRef, useState } from "react";
-import { CheckCircle2, Circle, FolderPlus, Share2, Trash2, X } from "lucide-react";
+import { useState } from "react";
+import { CheckCircle2, Circle, Share2, Trash2, X } from "lucide-react";
 import { BottomTabs } from "@/components/BottomTabs";
 import { SearchBar } from "@/components/SearchBar";
 import { Logo } from "@/components/Logo";
 import { useLongPress } from "@/hooks/use-long-press";
 import { playSongNow } from "@/lib/audio-player";
-import {
-  useMediaStore,
-  importAudioFiles,
-  deleteSongs,
-  shareItems,
-} from "@/lib/media-store";
+import { useMediaStore, deleteSongs, shareItems } from "@/lib/media-store";
 
 export const Route = createFileRoute("/music")({
   head: () => ({
@@ -30,7 +25,7 @@ function MusicPage() {
   const [q, setQ] = useState("");
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const fileRef = useRef<HTMLInputElement>(null);
+  
 
   if (pathname !== "/music") {
     return <Outlet />;
@@ -75,17 +70,7 @@ function MusicPage() {
 
   return (
     <div className="min-h-screen bg-background mx-auto max-w-md pb-20">
-      <input
-        ref={fileRef}
-        type="file"
-        accept="audio/*"
-        multiple
-        className="hidden"
-        onChange={(e) => {
-          if (e.target.files) importAudioFiles(e.target.files);
-          e.target.value = "";
-        }}
-      />
+
 
       <div className="px-4 pt-5 pb-3 space-y-4 sticky top-0 bg-background/95 backdrop-blur z-30 border-b border-border/50">
         {selectMode ? (
@@ -115,13 +100,7 @@ function MusicPage() {
           <div className="flex items-center justify-between">
             <Logo />
             <div className="flex items-center gap-1 -mr-2">
-              <button
-                onClick={() => fileRef.current?.click()}
-                className="p-2 text-foreground/80"
-                aria-label="Import from gallery"
-              >
-                <FolderPlus className="h-5 w-5" />
-              </button>
+
               <button
                 onClick={() => shareItems(songs.slice(0, 5).map((s) => ({ title: s.title, src: s.src })))}
                 className="p-2 text-foreground/80"
@@ -144,8 +123,9 @@ function MusicPage() {
 
       {list.length === 0 ? (
         <div className="px-6 py-16 text-center text-muted-foreground text-sm">
-          No music yet. Tap <FolderPlus className="inline h-4 w-4 align-text-bottom" /> to add audio.
+          No music found yet. Songs from your gallery will appear here automatically once permission is granted.
         </div>
+
       ) : (
         <ul className="px-2 pt-2">
           {list.map((s) => (

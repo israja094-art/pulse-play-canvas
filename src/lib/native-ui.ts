@@ -58,16 +58,41 @@ export const nativeDeleteFile = async (uri: string): Promise<boolean> => {
 };
 
 // ---------- Permissions ----------
+// Try multiple plugin paths so the OS-level dialog actually appears for both
+// READ_MEDIA_VIDEO and READ_MEDIA_AUDIO on Android 13+.
 export const requestMediaPermissions = async (): Promise<boolean> => {
   if (!isNative()) return true;
+  let granted = false;
+
+  // 1) Filesystem.requestPermissions — covers legacy READ_EXTERNAL_STORAGE
+  //    and (on some OEMs) the media group.
   try {
     const fs: any = await import(/* @vite-ignore */ ("@capacitor/filesystem" as string));
     const res = await fs.Filesystem.requestPermissions();
-    return res?.publicStorage === "granted";
+    if (res?.publicStorage === "granted") granted = true;
   } catch (e) {
-    console.warn("permission request failed", e);
-    return false;
+    console.warn("filesystem permission request failed", e);
   }
+
+  // 2) @capacitor-community/media — explicitly requests READ_MEDIA_VIDEO /
+  //    READ_MEDIA_AUDIO on Android 13+. Optional plugin: if not installed,
+  //    we silently fall back to whatever Filesystem returned above.
+  try {
+    const media: any = await import(
+      /* @vite-ignore */ ("@capacitor-community/media" as string)
+    );
+    const res = await media.Media.requestPermissions?.();
+    const ok =
+      res?.publicStorage === "granted" ||
+      res?.readMediaVideo === "granted" ||
+      res?.readMediaAudio === "granted" ||
+      res?.granted === true;
+    if (ok) granted = true;
+  } catch {
+    /* plugin not present — ignore */
+  }
+
+  return granted;
 };
 
 // ---------- Immersive system UI (status bar + nav bar) ----------
