@@ -64,17 +64,7 @@ function Index() {
 
   return (
     <div className="min-h-screen bg-background mx-auto max-w-md pb-20">
-      <input
-        ref={fileRef}
-        type="file"
-        accept="video/*"
-        multiple
-        className="hidden"
-        onChange={(e) => {
-          if (e.target.files) importVideoFiles(e.target.files);
-          e.target.value = "";
-        }}
-      />
+
 
       <div className="px-4 pt-5 pb-3 space-y-4 sticky top-0 bg-background/95 backdrop-blur z-30 border-b border-border/50">
         {selectMode ? (
