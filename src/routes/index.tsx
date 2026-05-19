@@ -1,16 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { CheckCircle2, Circle, Share2, Trash2, X } from "lucide-react";
 import { BottomTabs } from "@/components/BottomTabs";
 import { SearchBar } from "@/components/SearchBar";
 import { Logo } from "@/components/Logo";
 import { useLongPress } from "@/hooks/use-long-press";
-import {
-  useMediaStore,
-  importVideoFiles,
-  deleteVideos,
-  shareItems,
-} from "@/lib/media-store";
+import { useMediaStore, deleteVideos, shareItems } from "@/lib/media-store";
 
 export const Route = createFileRoute("/")({
   head: () => ({
