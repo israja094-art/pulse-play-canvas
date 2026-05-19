@@ -109,13 +109,7 @@ function Index() {
           <div className="flex items-center justify-between">
             <Logo />
             <div className="flex items-center gap-1 -mr-2">
-              <button
-                onClick={() => fileRef.current?.click()}
-                className="p-2 text-foreground/80"
-                aria-label="Import from gallery"
-              >
-                <FolderPlus className="h-5 w-5" />
-              </button>
+
               <button
                 onClick={() => {
                   const items = videos.map((v) => ({ title: v.title, src: v.src }));
