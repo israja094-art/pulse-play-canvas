@@ -123,8 +123,9 @@ function MusicPage() {
 
       {list.length === 0 ? (
         <div className="px-6 py-16 text-center text-muted-foreground text-sm">
-          No music yet. Tap <FolderPlus className="inline h-4 w-4 align-text-bottom" /> to add audio.
+          No music found yet. Songs from your gallery will appear here automatically once permission is granted.
         </div>
+
       ) : (
         <ul className="px-2 pt-2">
           {list.map((s) => (
