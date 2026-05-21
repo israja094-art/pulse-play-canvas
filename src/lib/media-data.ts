@@ -4,6 +4,7 @@ export type Video = {
   duration: string;
   thumb: string;
   src: string;
+  progress?: number; // Ye naya field hai history track karne ke liye
 };
 
 export type Song = {
