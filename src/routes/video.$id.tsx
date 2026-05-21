@@ -15,8 +15,18 @@ function VideoPage() {
   const { videos: list } = useMediaStore();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [playerControlsVisible, setPlayerControlsVisible] = useState(true); 
   const menuRef = useRef<HTMLDivElement>(null);
   const current = list.find((v) => v.id === id) ?? list[0];
+
+  // 👑 FIXED: Player ko baar-baar reload hone se bachane ke liye src ko ref mein rakha
+  const videoSrcRef = useRef<string>("");
+  const videoIdRef = useRef<string>("");
+
+  if (current && current.id !== videoIdRef.current) {
+    videoIdRef.current = current.id;
+    videoSrcRef.current = current.src;
+  }
 
   useEffect(() => {
     setMounted(true);
@@ -35,22 +45,34 @@ function VideoPage() {
     const len = list.length;
     if (!len) return;
     const next = list[((i % len) + len) % len];
-    navigate({ to: "/video/$id", params: { id: next.id } });
+    void navigate({ 
+      to: "/video/$id", 
+      params: { id: next.id },
+      resetScroll: false 
+    });
   };
 
   return (
     <div className="min-h-screen bg-background mx-auto max-w-md pb-20">
-      {/* Sticky locked player */}
-      <div className="sticky top-0 z-20 bg-black">
+      <div 
+        className="sticky top-0 z-20 bg-black touch-none"
+        onTouchMove={(e) => e.stopPropagation()}
+      >
         <div className="relative">
+          {/* FIXED: Ab src ko hilaaye bina background mein history save hoti rahegi */}
           <VideoPlayer
-            src={current.src}
+            src={videoSrcRef.current}
             onPrev={() => goTo(idx - 1)}
             onNext={() => goTo(idx + 1)}
+            onControlsVisibilityChange={(visible) => setPlayerControlsVisible(visible)}
           />
+          
           <Link
             to="/"
-            className="absolute top-3 left-3 z-30 text-primary p-2 rounded-full bg-black/40"
+            resetScroll={false}
+            className={`absolute top-3 left-3 z-30 text-primary p-2 rounded-full bg-black/40 transition-opacity duration-200 ${
+              playerControlsVisible ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+            }`}
             aria-label="Back"
           >
             <ArrowLeft className="h-5 w-5" />
@@ -62,34 +84,48 @@ function VideoPage() {
         </div>
       </div>
 
-      <ul>
+      <ul className="px-3 pt-3 space-y-2">
         {list.map((v) => {
           const active = v.id === current.id;
           return (
             <li key={v.id} className="relative">
               <div
-                className={`flex gap-3 items-center px-4 py-2 ${active ? "bg-primary/10" : ""}`}
+                className={`flex gap-3 items-center p-2 rounded-xl text-left transition-colors ${
+                  active ? "bg-primary/15" : "active:bg-secondary"
+                }`}
               >
                 <button
-                  onClick={() => navigate({ to: "/video/$id", params: { id: v.id } })}
-                  className="flex flex-1 items-center gap-3 min-w-0 text-left"
+                  onClick={() => {
+                    void navigate({ 
+                      to: "/video/$id", 
+                      params: { id: v.id }, 
+                      resetScroll: false 
+                    });
+                  }}
+                  className="flex flex-1 gap-3 items-center min-w-0 text-left"
                 >
-                  <img
-                    src={v.thumb}
-                    alt={v.title}
-                    className="h-14 w-24 rounded-md border border-border/60 object-cover flex-shrink-0 bg-secondary/70"
-                    loading="lazy"
-                  />
-                <p
-                  className={`flex-1 text-sm line-clamp-2 ${
-                    active ? "text-primary font-medium" : "text-foreground"
-                  }`}
-                >
-                  {v.title}
-                </p>
+                  <div className="relative h-20 w-32 overflow-hidden rounded-lg border border-border/60 bg-secondary/70 flex-shrink-0">
+                    <img
+                      src={v.thumb}
+                      alt={v.title}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background/90 to-transparent px-2 py-1 text-right">
+                      <span className="text-[10px] text-foreground">{v.duration}</span>
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm line-clamp-2 font-medium ${active ? "text-primary" : "text-foreground"}`}>
+                      {v.title}
+                    </p>
+                  </div>
                 </button>
+                
                 {active ? (
-                  <AudioLines className="h-4 w-4 text-primary flex-shrink-0" />
+                  <div className="pr-2 flex-shrink-0">
+                    <AudioLines className="h-4 w-4 text-primary animate-pulse" />
+                  </div>
                 ) : (
                   <button
                     onClick={(e) => {
@@ -97,21 +133,21 @@ function VideoPage() {
                       setOpenMenu(openMenu === v.id ? null : v.id);
                     }}
                     className="p-2 text-muted-foreground"
-                    aria-label="More"
                   >
                     <MoreVertical className="h-4 w-4" />
                   </button>
                 )}
               </div>
+              
               {openMenu === v.id && (
                 <div
                   ref={menuRef}
-                  className="absolute right-3 top-12 z-30 bg-popover border border-border rounded-lg shadow-lg py-1 w-32"
+                  className="absolute right-3 top-14 z-30 bg-popover border border-border rounded-lg shadow-lg py-1 w-32"
                 >
                   <button
                     onClick={() => {
                       setOpenMenu(null);
-                      navigate({ to: "/video/$id", params: { id: v.id } });
+                      void navigate({ to: "/video/$id", params: { id: v.id }, resetScroll: false });
                     }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent/20"
                   >
@@ -132,8 +168,11 @@ function VideoPage() {
                       setOpenMenu(null);
                       if (v.id === current.id) {
                         const remaining = list.filter((x) => x.id !== v.id);
-                        if (remaining.length) navigate({ to: "/video/$id", params: { id: remaining[0].id } });
-                        else navigate({ to: "/" });
+                        if (remaining.length) {
+                          void navigate({ to: "/video/$id", params: { id: remaining[0].id }, resetScroll: false });
+                        } else {
+                          void navigate({ to: "/" });
+                        }
                       }
                     }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-accent/20"
