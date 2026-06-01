@@ -145,6 +145,22 @@ export function VideoPlayer({
     };
   }, [expanded]);
 
+  // Fullscreen ⇒ rotate phone to landscape AND hide the system bars (black, only
+  // pulled in by a swipe from inside). Exiting ⇒ restore portrait + black bars.
+  useEffect(() => {
+    if (expanded) {
+      void lockOrientation("landscape");
+      void hideSystemUi();
+    } else {
+      void unlockOrientation();
+      void showSystemUi();
+    }
+    return () => {
+      // Safety: ensure bars come back if the player unmounts while fullscreen.
+      void showSystemUi();
+    };
+  }, [expanded]);
+
   // 👑 FIXED: dependency array se currentVideoData ko hataya taaki video chaltiyen loop na mare
   useEffect(() => {
     setPlaying(false);
