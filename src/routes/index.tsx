@@ -930,6 +930,10 @@ function VideoRow({
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm text-foreground line-clamp-2 font-medium">{video.title}</p>
+          <p className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground truncate">
+            <Folder className="h-3 w-3 text-primary flex-shrink-0" />
+            <span className="truncate">{getFolderName(video.src)}</span>
+          </p>
         </div>
       </button>
     </li>
