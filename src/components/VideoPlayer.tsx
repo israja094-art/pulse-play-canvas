@@ -25,10 +25,6 @@ import {
 
 const SPEEDS = [0.5, 1, 1.25, 1.5, 2];
 
-type VideoEl = HTMLVideoElement & {
-  webkitEnterFullscreen?: () => void;
-  webkitDisplayingFullscreen?: boolean;
-};
 
 type HistoryItem = {
   id: string;
