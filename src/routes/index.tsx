@@ -53,6 +53,16 @@ type HistoryItem = {
   lastPlayed: number;
 };
 
+const getFolderName = (src: string) => {
+  let folderName = "Internal Storage";
+  if (src && src.includes("/")) {
+    const parts = src.split("/");
+    if (parts.length > 1) folderName = parts[parts.length - 2] || "Internal Storage";
+  }
+  if (folderName.toLowerCase() === "0" || folderName === "") folderName = "Main Storage";
+  return folderName;
+};
+
 function Index() {
   const { videos } = useMediaStore();
   const navigate = useNavigate();
@@ -155,20 +165,16 @@ function Index() {
     return () => window.removeEventListener("click", closeMenu);
   }, [showMenuDropdown]);
 
-  const filteredVideos = videos.filter((v) => v.title.toLowerCase().includes(q.toLowerCase()));
+  const query = q.trim().toLowerCase();
+  const filteredVideos = videos.filter(
+    (v) =>
+      v.title.toLowerCase().includes(query) ||
+      getFolderName(v.src).toLowerCase().includes(query),
+  );
 
   const foldersMap: Record<string, typeof videos> = {};
   filteredVideos.forEach((video) => {
-    let folderName = "Internal Storage";
-    if (video.src && video.src.includes("/")) {
-      const parts = video.src.split("/");
-      if (parts.length > 1) {
-        folderName = parts[parts.length - 2] || "Internal Storage";
-      }
-    }
-    if (folderName.toLowerCase() === "0" || folderName === "") {
-      folderName = "Main Storage";
-    }
+    const folderName = getFolderName(video.src);
     if (!foldersMap[folderName]) {
       foldersMap[folderName] = [];
     }
@@ -924,6 +930,10 @@ function VideoRow({
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm text-foreground line-clamp-2 font-medium">{video.title}</p>
+          <p className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground truncate">
+            <Folder className="h-3 w-3 text-primary flex-shrink-0" />
+            <span className="truncate">{getFolderName(video.src)}</span>
+          </p>
         </div>
       </button>
     </li>
