@@ -16,6 +16,12 @@ import {
 } from "lucide-react";
 import { formatTime } from "@/lib/media-data";
 import { useMediaStore } from "@/lib/media-store";
+import {
+  hideSystemUi,
+  showSystemUi,
+  lockOrientation,
+  unlockOrientation,
+} from "@/lib/native-ui";
 
 const SPEEDS = [0.5, 1, 1.25, 1.5, 2];
 
