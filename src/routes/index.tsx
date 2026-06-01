@@ -53,6 +53,16 @@ type HistoryItem = {
   lastPlayed: number;
 };
 
+const getFolderName = (src: string) => {
+  let folderName = "Internal Storage";
+  if (src && src.includes("/")) {
+    const parts = src.split("/");
+    if (parts.length > 1) folderName = parts[parts.length - 2] || "Internal Storage";
+  }
+  if (folderName.toLowerCase() === "0" || folderName === "") folderName = "Main Storage";
+  return folderName;
+};
+
 function Index() {
   const { videos } = useMediaStore();
   const navigate = useNavigate();
