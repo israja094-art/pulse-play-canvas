@@ -348,21 +348,23 @@ export function VideoPlayer({
 
   const toggleFullscreen = () => {
     const el = wrapRef.current;
-    const v = videoRef.current as VideoEl | null;
-    if (!el || !v) return;
-    if (document.fullscreenElement === el || expanded) {
-      if (document.fullscreenElement === el) document.exitFullscreen?.().catch(() => setExpanded(false));
-      else setExpanded(false);
-      flashOverlay("Mini player"); reveal(); return;
+    if (!el) return;
+    // Exit fullscreen
+    if (expanded || document.fullscreenElement === el) {
+      if (document.fullscreenElement === el) document.exitFullscreen?.().catch(() => {});
+      setExpanded(false); // effect handles unlock orientation + restore bars
+      flashOverlay("Mini player");
+      reveal();
+      return;
     }
-    const lockLandscape = async () => {
-      try { await (screen.orientation as any).lock?.("landscape"); } catch { /* ignore */ }
-    };
-    if (el.requestFullscreen) el.requestFullscreen().then(lockLandscape).catch(() => setExpanded(true));
-    else if (v.webkitEnterFullscreen) { try { v.webkitEnterFullscreen(); } catch { setExpanded(true); } }
-    else setExpanded(true);
-    flashOverlay("Fullscreen"); reveal();
+    // Enter fullscreen: expanded state drives the landscape rotation + immersive
+    // bars via the [expanded] effect. Browser fullscreen is requested too (web).
+    setExpanded(true);
+    if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+    flashOverlay("Fullscreen");
+    reveal();
   };
+
 
   const cycleZoom = () => {
     const levels = [1, 1.25, 1.5, 2];
