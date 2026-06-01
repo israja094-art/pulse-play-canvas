@@ -26,7 +26,6 @@ import { useLongPress } from "@/hooks/use-long-press";
 import { runNativeScan } from "@/lib/native-scanner";
 import {
   useMediaStore,
-  importVideoFiles,
   deleteVideos,
   shareItems,
   renameVideoFile,
@@ -71,7 +70,6 @@ function Index() {
   const [selectMode, setSelectMode] = useState(false);
   const [showMenuDropdown, setShowMenuDropdown] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const fileRef = useRef<HTMLInputElement>(null);
 
   const [activeTab, setActiveTab] = useState<"all" | "folders">("all");
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
@@ -450,18 +448,6 @@ function Index() {
 
   return (
     <div className="min-h-screen bg-background mx-auto max-w-md pb-32">
-      <input
-        ref={fileRef}
-        type="file"
-        accept="video/*"
-        multiple
-        className="hidden"
-        onChange={(e) => {
-          if (e.target.files) importVideoFiles(e.target.files);
-          e.target.value = "";
-        }}
-      />
-
       {/* --- STICKY TOP HEADER ZONE --- */}
       <div className="px-4 pt-5 pb-3 space-y-4 sticky top-0 bg-background/95 backdrop-blur z-30 border-b border-border/50">
         {selectMode ? (

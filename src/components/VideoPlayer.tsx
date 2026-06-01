@@ -19,6 +19,8 @@ import { useMediaStore } from "@/lib/media-store";
 import {
   hideSystemUi,
   showSystemUi,
+  peekSystemUi,
+  scheduleSystemUiHide,
   lockOrientation,
   unlockOrientation,
 } from "@/lib/native-ui";
@@ -78,6 +80,8 @@ export function VideoPlayer({
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTapRef = useRef<{ t: number; x: number } | null>(null);
   const pinchRef = useRef<{ distance: number; startZoom: number } | null>(null);
+  const controlsOnlyHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suppressSurfaceClickUntilRef = useRef(0);
   
   const lastHistoryUpdateRef = useRef<number>(0);
 
@@ -104,6 +108,15 @@ export function VideoPlayer({
     }, 2500);
   }, []);
 
+  const armFullscreenControlsHide = useCallback(() => {
+    if (controlsOnlyHideTimer.current) clearTimeout(controlsOnlyHideTimer.current);
+    controlsOnlyHideTimer.current = setTimeout(() => {
+      setShowControls(false);
+      setShowSpeed(false);
+      setShowEq(false);
+    }, 1800);
+  }, []);
+
   const reveal = useCallback(() => {
     setShowControls(true);
     armHide();
@@ -118,6 +131,7 @@ export function VideoPlayer({
     armHide();
     return () => {
       if (hideTimer.current) clearTimeout(hideTimer.current);
+      if (controlsOnlyHideTimer.current) clearTimeout(controlsOnlyHideTimer.current);
     };
   }, [armHide]);
 
@@ -147,6 +161,7 @@ export function VideoPlayer({
     if (expanded) {
       void lockOrientation("landscape");
       void hideSystemUi();
+      armFullscreenControlsHide();
     } else {
       void unlockOrientation();
       void showSystemUi();
@@ -155,7 +170,7 @@ export function VideoPlayer({
       // Safety: ensure bars come back if the player unmounts while fullscreen.
       void showSystemUi();
     };
-  }, [expanded]);
+  }, [armFullscreenControlsHide, expanded]);
 
   // 👑 FIXED: dependency array se currentVideoData ko hataya taaki video chaltiyen loop na mare
   useEffect(() => {
@@ -311,7 +326,11 @@ export function VideoPlayer({
     audioCtxRef.current?.resume();
     if (v.paused) { v.play().catch(() => {}); setPlaying(true); }
     else { v.pause(); setPlaying(false); }
-    reveal();
+    if (expanded) {
+      armFullscreenControlsHide();
+    } else {
+      reveal();
+    }
   };
 
   const seekBy = (delta: number) => {
@@ -339,7 +358,11 @@ export function VideoPlayer({
     if (!v.muted && v.volume === 0) { v.volume = 1; setVolume(1); }
     setMuted(v.muted);
     flashOverlay(v.muted ? "Muted" : `Volume ${Math.round(v.volume * 100)}%`);
-    reveal();
+    if (expanded) {
+      armFullscreenControlsHide();
+    } else {
+      reveal();
+    }
   };
 
   const toggleFullscreen = () => {
@@ -446,14 +469,57 @@ export function VideoPlayer({
       const now = Date.now();
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
       const x = (e.changedTouches[0]?.clientX ?? g.x) - rect.left;
-      if (!showControls || isLocked) { setShowControls(true); armHide(); lastTapRef.current = null; gesture.current = null; return; }
+      const isTopEdge = (e.changedTouches[0]?.clientY ?? g.y) - rect.top < 44;
+      const isBottomEdge = rect.bottom - (e.changedTouches[0]?.clientY ?? g.y) < 56;
+      if (expanded && (isTopEdge || isBottomEdge)) {
+        suppressSurfaceClickUntilRef.current = Date.now() + 450;
+        setShowControls(false);
+        setShowEq(false);
+        setShowSpeed(false);
+        void peekSystemUi();
+        lastTapRef.current = null;
+        gesture.current = null;
+        return;
+      }
+      if (!showControls || isLocked) {
+        setShowControls(true);
+        if (expanded) {
+          armFullscreenControlsHide();
+        } else {
+          armHide();
+        }
+        lastTapRef.current = null;
+        gesture.current = null;
+        return;
+      }
       if (lastTapRef.current && now - lastTapRef.current.t < 300) {
         const sameSide = (lastTapRef.current.x < rect.width / 2 && x < rect.width / 2) || (lastTapRef.current.x >= rect.width / 2 && x >= rect.width / 2);
-        if (sameSide) { seekBy(x >= rect.width / 2 ? 10 : -10); lastTapRef.current = null; gesture.current = null; armHide(); return; }
+        if (sameSide) {
+          seekBy(x >= rect.width / 2 ? 10 : -10);
+          lastTapRef.current = null;
+          gesture.current = null;
+          if (expanded) {
+            armFullscreenControlsHide();
+          } else {
+            armHide();
+          }
+          return;
+        }
+      }
+      if (expanded) {
+        setShowControls(true);
+        armFullscreenControlsHide();
       }
       lastTapRef.current = { t: now, x };
     }
-    gesture.current = null; setTimeout(() => setOverlay(null), 600); armHide();
+    gesture.current = null;
+    setTimeout(() => setOverlay(null), 600);
+    if (expanded) {
+      armFullscreenControlsHide();
+      scheduleSystemUiHide();
+    } else {
+      armHide();
+    }
   };
 
   const pct = duration ? (current / duration) * 100 : 0;
@@ -466,7 +532,17 @@ export function VideoPlayer({
       className={`bg-black overflow-hidden select-none ${
         expanded ? "fixed inset-0 z-50 h-dvh w-screen" : "relative w-full aspect-video"
       }`}
-      onClick={() => { if (!showControls) { setShowControls(true); armHide(); } }}
+      onClick={() => {
+        if (Date.now() < suppressSurfaceClickUntilRef.current) return;
+        if (!showControls) {
+          setShowControls(true);
+          if (expanded) {
+            armFullscreenControlsHide();
+          } else {
+            armHide();
+          }
+        }
+      }}
       onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
       style={{ filter: `brightness(${brightness}%)` }}
     >
