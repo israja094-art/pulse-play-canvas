@@ -81,6 +81,7 @@ export function VideoPlayer({
   const lastTapRef = useRef<{ t: number; x: number } | null>(null);
   const pinchRef = useRef<{ distance: number; startZoom: number } | null>(null);
   const controlsOnlyHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suppressSurfaceClickUntilRef = useRef(0);
   
   const lastHistoryUpdateRef = useRef<number>(0);
 
@@ -471,6 +472,10 @@ export function VideoPlayer({
       const isTopEdge = (e.changedTouches[0]?.clientY ?? g.y) - rect.top < 44;
       const isBottomEdge = rect.bottom - (e.changedTouches[0]?.clientY ?? g.y) < 56;
       if (expanded && (isTopEdge || isBottomEdge)) {
+        suppressSurfaceClickUntilRef.current = Date.now() + 450;
+        setShowControls(false);
+        setShowEq(false);
+        setShowSpeed(false);
         void peekSystemUi();
         lastTapRef.current = null;
         gesture.current = null;
@@ -528,6 +533,7 @@ export function VideoPlayer({
         expanded ? "fixed inset-0 z-50 h-dvh w-screen" : "relative w-full aspect-video"
       }`}
       onClick={() => {
+        if (Date.now() < suppressSurfaceClickUntilRef.current) return;
         if (!showControls) {
           setShowControls(true);
           if (expanded) {
