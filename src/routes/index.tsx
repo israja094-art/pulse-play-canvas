@@ -165,20 +165,16 @@ function Index() {
     return () => window.removeEventListener("click", closeMenu);
   }, [showMenuDropdown]);
 
-  const filteredVideos = videos.filter((v) => v.title.toLowerCase().includes(q.toLowerCase()));
+  const query = q.trim().toLowerCase();
+  const filteredVideos = videos.filter(
+    (v) =>
+      v.title.toLowerCase().includes(query) ||
+      getFolderName(v.src).toLowerCase().includes(query),
+  );
 
   const foldersMap: Record<string, typeof videos> = {};
   filteredVideos.forEach((video) => {
-    let folderName = "Internal Storage";
-    if (video.src && video.src.includes("/")) {
-      const parts = video.src.split("/");
-      if (parts.length > 1) {
-        folderName = parts[parts.length - 2] || "Internal Storage";
-      }
-    }
-    if (folderName.toLowerCase() === "0" || folderName === "") {
-      folderName = "Main Storage";
-    }
+    const folderName = getFolderName(video.src);
     if (!foldersMap[folderName]) {
       foldersMap[folderName] = [];
     }
