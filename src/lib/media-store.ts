@@ -507,7 +507,7 @@ export const importAudioFiles = async (files: FileList | File[]) => {
 };
 
 // 🔥 FIXED SHARE FEATURE: EXTRACTS NATIVE FILE PATH AND FORCES MP4 MIME TYPE FOR ANDROID
-export const shareItems = async (items: { id: string; title: string; src: string }[]) => {
+export const shareItems = async (items: { id?: string; title: string; src: string }[]) => {
   if (items.length === 0) return;
 
   try {
@@ -520,6 +520,7 @@ export const shareItems = async (items: { id: string; title: string; src: string
         try {
           const fileUriResult = await Filesystem.getUri({
             path: rawNativePath,
+            directory: Directory.ExternalStorage,
           });
           if (fileUriResult && fileUriResult.uri) {
             filesToShare.push(fileUriResult.uri);
