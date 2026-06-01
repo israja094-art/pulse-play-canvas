@@ -9,6 +9,15 @@ const isNative = (): boolean => {
 
 export const isNativePlatform = isNative;
 
+let systemUiHideTimer: ReturnType<typeof setTimeout> | null = null;
+
+const clearSystemUiHideTimer = () => {
+  if (systemUiHideTimer) {
+    clearTimeout(systemUiHideTimer);
+    systemUiHideTimer = null;
+  }
+};
+
 // ---------- Share ----------
 export const nativeShare = async (
   title: string,
@@ -141,18 +150,35 @@ const hideNavBar = async () => {
 // Hide both system bars (used ONLY for fullscreen video).
 export const hideSystemUi = async () => {
   if (!isNative()) return;
+  clearSystemUiHideTimer();
   await Promise.all([hideStatusBar(), hideNavBar()]);
 };
 
 // Restore both system bars as solid BLACK bars with light content.
 export const showSystemUi = async () => {
   if (!isNative()) return;
+  clearSystemUiHideTimer();
   await Promise.all([setStatusBarBlack(), setNavBarBlack()]);
+};
+
+export const scheduleSystemUiHide = (delay = 1600) => {
+  if (!isNative()) return;
+  clearSystemUiHideTimer();
+  systemUiHideTimer = setTimeout(() => {
+    void hideSystemUi();
+  }, delay);
+};
+
+export const peekSystemUi = async (delay = 1600) => {
+  if (!isNative()) return;
+  await showSystemUi();
+  scheduleSystemUiHide(delay);
 };
 
 // Set up the persistent black, always-visible system bars on launch.
 export const initImmersive = () => {
   if (!isNative()) return;
+  clearSystemUiHideTimer();
   void showSystemUi();
   // Re-apply after first paint in case the OEM resets bar colors late.
   setTimeout(() => void showSystemUi(), 700);
