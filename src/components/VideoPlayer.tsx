@@ -83,6 +83,7 @@ export function VideoPlayer({
   const controlsOnlyHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressSurfaceClickUntilRef = useRef(0);
   const fullscreenExitRef = useRef(false);
+  const expandedRef = useRef(false);
   
   const lastHistoryUpdateRef = useRef<number>(0);
 
@@ -130,6 +131,10 @@ export function VideoPlayer({
   }, [showControls, isSwipingActive, isLocked, onControlsVisibilityChange]);
 
   useEffect(() => {
+    expandedRef.current = expanded;
+  }, [expanded]);
+
+  useEffect(() => {
     armHide();
     return () => {
       if (hideTimer.current) clearTimeout(hideTimer.current);
@@ -146,6 +151,50 @@ export function VideoPlayer({
     };
     document.addEventListener("fullscreenchange", onFullscreenChange);
     return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
+
+  useEffect(() => {
+    const onPopState = () => {
+      if (!expandedRef.current) return;
+      fullscreenExitRef.current = true;
+      setExpanded(false);
+      if (document.fullscreenElement) {
+        document.exitFullscreen?.().catch(() => {});
+      }
+    };
+
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  useEffect(() => {
+    let removeBackHandler: (() => void) | undefined;
+
+    const bindNativeBack = async () => {
+      try {
+        const mod: any = await import(/* @vite-ignore */ ("@capacitor/app" as string));
+        const listener = await mod.App.addListener?.("backButton", () => {
+          if (!expandedRef.current) return;
+          fullscreenExitRef.current = true;
+          setExpanded(false);
+          if (document.fullscreenElement) {
+            document.exitFullscreen?.().catch(() => {});
+          }
+        });
+
+        removeBackHandler = () => {
+          listener?.remove?.();
+        };
+      } catch {
+        /* native back plugin missing */
+      }
+    };
+
+    void bindNativeBack();
+
+    return () => {
+      removeBackHandler?.();
+    };
   }, []);
 
   useEffect(() => {
@@ -173,11 +222,17 @@ export function VideoPlayer({
       void lockOrientation("portrait");
       void showSystemUi();
     }
-    return () => {
-      // Safety: ensure bars come back if the player unmounts while fullscreen.
-      void showSystemUi();
-    };
   }, [armFullscreenControlsHide, expanded]);
+
+  useEffect(() => {
+    return () => {
+      void lockOrientation("portrait");
+      void showSystemUi();
+      setTimeout(() => {
+        void unlockOrientation();
+      }, 220);
+    };
+  }, []);
 
   useEffect(() => {
     if (!expanded && fullscreenExitRef.current) {
@@ -543,11 +598,13 @@ export function VideoPlayer({
   const pct = duration ? (current / duration) * 100 : 0;
   const stopBubble = (e: React.SyntheticEvent) => e.stopPropagation();
   const areControlsVisible = showControls && !isSwipingActive && !isLocked;
+  const controlShellClass =
+    "inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-primary backdrop-blur-sm transition-transform duration-200 active:scale-95 shrink-0";
   const expandedTopInset = expanded
-    ? { paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)" }
+    ? { paddingTop: "calc(env(safe-area-inset-top, 0px) + 10px)" }
     : undefined;
   const expandedBottomInset = expanded
-    ? { paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 8px)" }
+    ? { paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 10px)" }
     : undefined;
   const expandedLockInset = expanded
     ? { top: "calc(env(safe-area-inset-top, 0px) + 50%)" }
@@ -575,7 +632,7 @@ export function VideoPlayer({
     >
       <video
         ref={videoRef} src={src}
-        className="w-full h-full object-contain bg-black transition-transform duration-150"
+        className="w-full h-full object-contain bg-black transition-transform duration-200 ease-out"
         playsInline autoPlay muted={muted} loop={looping}
         style={{ transform: `scale(${zoom})` }}
         onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)}
@@ -583,18 +640,20 @@ export function VideoPlayer({
       />
       
       <div className={`absolute left-3 top-1/2 -translate-y-1/2 z-50 transition-opacity duration-200 ${showControls ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`} onClick={stopBubble} onTouchStart={stopBubble} onTouchEnd={stopBubble} style={expandedLockInset}>
-        <button onClick={() => { setIsLocked(!isLocked); reveal(); }} className="bg-black/60 text-primary p-3 rounded-full border border-primary/20 backdrop-blur-sm active:scale-90 transition-transform" aria-label={isLocked ? "Unlock interface" : "Lock interface"}>
+        <button onClick={() => { setIsLocked(!isLocked); reveal(); }} className="flex h-12 w-12 items-center justify-center rounded-full border border-primary/20 bg-black/60 text-primary backdrop-blur-sm transition-transform duration-200 active:scale-90" aria-label={isLocked ? "Unlock interface" : "Lock interface"}>
           {isLocked ? <Lock className="h-5 w-5 text-destructive animate-pulse" /> : <Unlock className="h-5 w-5" />}
         </button>
       </div>
 
-      <div onTouchStart={stopBubble} onTouchEnd={stopBubble} onTouchMove={stopBubble} className={`absolute top-0 left-0 right-0 z-30 flex items-center justify-end gap-1 p-2 bg-gradient-to-b from-black/70 to-transparent transition-opacity duration-200 ${areControlsVisible ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`} style={expandedTopInset}>
-        <button onClick={toggleMute} className="text-primary p-2.5 active:scale-95">{muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}</button>
-        <button onClick={() => { ensureAudioGraph(); audioCtxRef.current?.resume(); setShowEq(!showEq); setShowSpeed(false); reveal(); }} className="text-primary p-2.5 active:scale-95"><Sliders className="h-5 w-5" /></button>
-        <button onClick={() => { setShowSpeed(!showSpeed); setShowEq(false); reveal(); }} className="text-primary p-2.5 flex items-center gap-1 active:scale-95"><Gauge className="h-5 w-5" /> <span className="text-xs">{speed}x</span></button>
-        <button onClick={toggleFullscreen} className="text-primary p-2.5 active:scale-95"><Maximize className="h-5 w-5" /></button>
-        <button onClick={toggleLoop} className={`p-2.5 active:scale-95 ${looping ? "text-primary" : "text-muted-foreground"}`}><Repeat className="h-5 w-5" /></button>
-        <button onClick={cycleZoom} className="text-primary p-2.5 active:scale-95 flex items-center gap-1"><ZoomIn className="h-5 w-5" /> <span className="text-xs">{Math.round(zoom * 100)}%</span></button>
+      <div onTouchStart={stopBubble} onTouchEnd={stopBubble} onTouchMove={stopBubble} className={`absolute top-0 left-0 right-0 z-30 flex justify-end px-2 pb-2 transition-opacity duration-200 ${areControlsVisible ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`} style={expandedTopInset}>
+        <div className="flex max-w-full items-center gap-1 rounded-full bg-black/18 px-1 py-1 backdrop-blur-md">
+          <button onClick={toggleMute} className={controlShellClass}>{muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}</button>
+          <button onClick={() => { ensureAudioGraph(); audioCtxRef.current?.resume(); setShowEq(!showEq); setShowSpeed(false); reveal(); }} className={controlShellClass}><Sliders className="h-5 w-5" /></button>
+          <button onClick={() => { setShowSpeed(!showSpeed); setShowEq(false); reveal(); }} className={controlShellClass}><Gauge className="h-5 w-5" /></button>
+          <button onClick={toggleFullscreen} className={controlShellClass}><Maximize className="h-5 w-5" /></button>
+          <button onClick={toggleLoop} className={`${controlShellClass} ${looping ? "text-primary" : "text-muted-foreground"}`}><Repeat className="h-5 w-5" /></button>
+          <button onClick={cycleZoom} className={controlShellClass}><ZoomIn className="h-5 w-5" /></button>
+        </div>
       </div>
 
       {showSpeed && areControlsVisible && (
