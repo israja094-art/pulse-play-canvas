@@ -152,6 +152,9 @@ export const hideSystemUi = async () => {
   if (!isNative()) return;
   clearSystemUiHideTimer();
   await Promise.all([hideStatusBar(), hideNavBar()]);
+  setTimeout(() => {
+    void Promise.all([hideStatusBar(), hideNavBar()]);
+  }, 120);
 };
 
 // Restore both system bars as solid BLACK bars with light content.
@@ -159,6 +162,9 @@ export const showSystemUi = async () => {
   if (!isNative()) return;
   clearSystemUiHideTimer();
   await Promise.all([setStatusBarBlack(), setNavBarBlack()]);
+  setTimeout(() => {
+    void Promise.all([setStatusBarBlack(), setNavBarBlack()]);
+  }, 120);
 };
 
 export const scheduleSystemUiHide = (delay = 1600) => {

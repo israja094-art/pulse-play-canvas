@@ -82,6 +82,7 @@ export function VideoPlayer({
   const pinchRef = useRef<{ distance: number; startZoom: number } | null>(null);
   const controlsOnlyHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressSurfaceClickUntilRef = useRef(0);
+  const fullscreenExitRef = useRef(false);
   
   const lastHistoryUpdateRef = useRef<number>(0);
 
@@ -114,6 +115,7 @@ export function VideoPlayer({
       setShowControls(false);
       setShowSpeed(false);
       setShowEq(false);
+      void hideSystemUi();
     }, 1800);
   }, []);
 
@@ -137,7 +139,10 @@ export function VideoPlayer({
 
   useEffect(() => {
     const onFullscreenChange = () => {
-      if (!document.fullscreenElement) setExpanded(false);
+      if (!document.fullscreenElement) {
+        fullscreenExitRef.current = true;
+        setExpanded(false);
+      }
     };
     document.addEventListener("fullscreenchange", onFullscreenChange);
     return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
@@ -159,11 +164,13 @@ export function VideoPlayer({
   // pulled in by a swipe from inside). Exiting ⇒ restore portrait + black bars.
   useEffect(() => {
     if (expanded) {
+      fullscreenExitRef.current = false;
       void lockOrientation("landscape");
       void hideSystemUi();
       armFullscreenControlsHide();
     } else {
-      void unlockOrientation();
+      if (controlsOnlyHideTimer.current) clearTimeout(controlsOnlyHideTimer.current);
+      void lockOrientation("portrait");
       void showSystemUi();
     }
     return () => {
@@ -171,6 +178,16 @@ export function VideoPlayer({
       void showSystemUi();
     };
   }, [armFullscreenControlsHide, expanded]);
+
+  useEffect(() => {
+    if (!expanded && fullscreenExitRef.current) {
+      const reset = setTimeout(() => {
+        void unlockOrientation();
+        fullscreenExitRef.current = false;
+      }, 220);
+      return () => clearTimeout(reset);
+    }
+  }, [expanded]);
 
   // 👑 FIXED: dependency array se currentVideoData ko hataya taaki video chaltiyen loop na mare
   useEffect(() => {
@@ -371,6 +388,7 @@ export function VideoPlayer({
     // Exit fullscreen
     if (expanded || document.fullscreenElement === el) {
       if (document.fullscreenElement === el) document.exitFullscreen?.().catch(() => {});
+      fullscreenExitRef.current = true;
       setExpanded(false); // effect handles unlock orientation + restore bars
       flashOverlay("Mini player");
       reveal();
@@ -525,6 +543,15 @@ export function VideoPlayer({
   const pct = duration ? (current / duration) * 100 : 0;
   const stopBubble = (e: React.SyntheticEvent) => e.stopPropagation();
   const areControlsVisible = showControls && !isSwipingActive && !isLocked;
+  const expandedTopInset = expanded
+    ? { paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)" }
+    : undefined;
+  const expandedBottomInset = expanded
+    ? { paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 8px)" }
+    : undefined;
+  const expandedLockInset = expanded
+    ? { top: "calc(env(safe-area-inset-top, 0px) + 50%)" }
+    : undefined;
 
   return (
     <div
@@ -555,13 +582,13 @@ export function VideoPlayer({
         onVolumeChange={() => { if (videoRef.current) { setMuted(videoRef.current.muted); setVolume(videoRef.current.volume); } }}
       />
       
-      <div className={`absolute left-3 top-1/2 -translate-y-1/2 z-50 transition-opacity duration-200 ${showControls ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`} onClick={stopBubble} onTouchStart={stopBubble} onTouchEnd={stopBubble}>
+      <div className={`absolute left-3 top-1/2 -translate-y-1/2 z-50 transition-opacity duration-200 ${showControls ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`} onClick={stopBubble} onTouchStart={stopBubble} onTouchEnd={stopBubble} style={expandedLockInset}>
         <button onClick={() => { setIsLocked(!isLocked); reveal(); }} className="bg-black/60 text-primary p-3 rounded-full border border-primary/20 backdrop-blur-sm active:scale-90 transition-transform" aria-label={isLocked ? "Unlock interface" : "Lock interface"}>
           {isLocked ? <Lock className="h-5 w-5 text-destructive animate-pulse" /> : <Unlock className="h-5 w-5" />}
         </button>
       </div>
 
-      <div onTouchStart={stopBubble} onTouchEnd={stopBubble} onTouchMove={stopBubble} className={`absolute top-0 left-0 right-0 z-30 flex items-center justify-end gap-1 p-2 bg-gradient-to-b from-black/70 to-transparent transition-opacity duration-200 ${areControlsVisible ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}>
+      <div onTouchStart={stopBubble} onTouchEnd={stopBubble} onTouchMove={stopBubble} className={`absolute top-0 left-0 right-0 z-30 flex items-center justify-end gap-1 p-2 bg-gradient-to-b from-black/70 to-transparent transition-opacity duration-200 ${areControlsVisible ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`} style={expandedTopInset}>
         <button onClick={toggleMute} className="text-primary p-2.5 active:scale-95">{muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}</button>
         <button onClick={() => { ensureAudioGraph(); audioCtxRef.current?.resume(); setShowEq(!showEq); setShowSpeed(false); reveal(); }} className="text-primary p-2.5 active:scale-95"><Sliders className="h-5 w-5" /></button>
         <button onClick={() => { setShowSpeed(!showSpeed); setShowEq(false); reveal(); }} className="text-primary p-2.5 flex items-center gap-1 active:scale-95"><Gauge className="h-5 w-5" /> <span className="text-xs">{speed}x</span></button>
@@ -599,7 +626,7 @@ export function VideoPlayer({
         </div>
       )}
 
-      <div className={`absolute bottom-0 left-0 right-0 z-20 px-3 pb-2 pt-6 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-200 ${areControlsVisible ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`} onClick={stopBubble} onTouchStart={stopBubble} onTouchEnd={stopBubble} onTouchMove={stopBubble}>
+      <div className={`absolute bottom-0 left-0 right-0 z-20 px-3 pb-2 pt-6 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-200 ${areControlsVisible ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`} onClick={stopBubble} onTouchStart={stopBubble} onTouchEnd={stopBubble} onTouchMove={stopBubble} style={expandedBottomInset}>
         <div className="flex items-center justify-between text-xs text-white mb-1">
           <span>{formatTime(current)}</span> <span>{formatTime(duration)}</span>
         </div>
