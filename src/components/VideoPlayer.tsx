@@ -82,6 +82,7 @@ export function VideoPlayer({
   const pinchRef = useRef<{ distance: number; startZoom: number } | null>(null);
   const controlsOnlyHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressSurfaceClickUntilRef = useRef(0);
+  const fullscreenExitRef = useRef(false);
   
   const lastHistoryUpdateRef = useRef<number>(0);
 
@@ -114,6 +115,7 @@ export function VideoPlayer({
       setShowControls(false);
       setShowSpeed(false);
       setShowEq(false);
+      void hideSystemUi();
     }, 1800);
   }, []);
 
@@ -137,7 +139,10 @@ export function VideoPlayer({
 
   useEffect(() => {
     const onFullscreenChange = () => {
-      if (!document.fullscreenElement) setExpanded(false);
+      if (!document.fullscreenElement) {
+        fullscreenExitRef.current = true;
+        setExpanded(false);
+      }
     };
     document.addEventListener("fullscreenchange", onFullscreenChange);
     return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
@@ -159,11 +164,12 @@ export function VideoPlayer({
   // pulled in by a swipe from inside). Exiting ⇒ restore portrait + black bars.
   useEffect(() => {
     if (expanded) {
+      fullscreenExitRef.current = false;
       void lockOrientation("landscape");
       void hideSystemUi();
       armFullscreenControlsHide();
     } else {
-      void unlockOrientation();
+      void lockOrientation("portrait");
       void showSystemUi();
     }
     return () => {
@@ -171,6 +177,16 @@ export function VideoPlayer({
       void showSystemUi();
     };
   }, [armFullscreenControlsHide, expanded]);
+
+  useEffect(() => {
+    if (!expanded && fullscreenExitRef.current) {
+      const reset = setTimeout(() => {
+        void unlockOrientation();
+        fullscreenExitRef.current = false;
+      }, 220);
+      return () => clearTimeout(reset);
+    }
+  }, [expanded]);
 
   // 👑 FIXED: dependency array se currentVideoData ko hataya taaki video chaltiyen loop na mare
   useEffect(() => {
