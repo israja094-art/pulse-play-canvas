@@ -168,6 +168,36 @@ export function VideoPlayer({
   }, []);
 
   useEffect(() => {
+    let removeBackHandler: (() => void) | undefined;
+
+    const bindNativeBack = async () => {
+      try {
+        const mod: any = await import(/* @vite-ignore */ ("@capacitor/app" as string));
+        const listener = await mod.App.addListener?.("backButton", () => {
+          if (!expandedRef.current) return;
+          fullscreenExitRef.current = true;
+          setExpanded(false);
+          if (document.fullscreenElement) {
+            document.exitFullscreen?.().catch(() => {});
+          }
+        });
+
+        removeBackHandler = () => {
+          listener?.remove?.();
+        };
+      } catch {
+        /* native back plugin missing */
+      }
+    };
+
+    void bindNativeBack();
+
+    return () => {
+      removeBackHandler?.();
+    };
+  }, []);
+
+  useEffect(() => {
     if (!expanded) return;
     const pB = document.body.style.overflow;
     const pH = document.documentElement.style.overflow;
