@@ -222,15 +222,17 @@ export function VideoPlayer({
       void lockOrientation("portrait");
       void showSystemUi();
     }
+  }, [armFullscreenControlsHide, expanded]);
+
+  useEffect(() => {
     return () => {
-      // Safety: ensure portrait + bars restore even if the route changes while fullscreen.
       void lockOrientation("portrait");
       void showSystemUi();
       setTimeout(() => {
         void unlockOrientation();
       }, 220);
     };
-  }, [armFullscreenControlsHide, expanded]);
+  }, []);
 
   useEffect(() => {
     if (!expanded && fullscreenExitRef.current) {
