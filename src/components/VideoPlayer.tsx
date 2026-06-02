@@ -388,6 +388,7 @@ export function VideoPlayer({
     // Exit fullscreen
     if (expanded || document.fullscreenElement === el) {
       if (document.fullscreenElement === el) document.exitFullscreen?.().catch(() => {});
+      fullscreenExitRef.current = true;
       setExpanded(false); // effect handles unlock orientation + restore bars
       flashOverlay("Mini player");
       reveal();
