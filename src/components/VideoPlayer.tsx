@@ -169,6 +169,7 @@ export function VideoPlayer({
       void hideSystemUi();
       armFullscreenControlsHide();
     } else {
+      if (controlsOnlyHideTimer.current) clearTimeout(controlsOnlyHideTimer.current);
       void lockOrientation("portrait");
       void showSystemUi();
     }
