@@ -10,10 +10,15 @@ import {
   SkipForward,
   Shuffle,
   Repeat,
+  SlidersHorizontal,
+  Moon,
+  Music2,
 } from "lucide-react";
 import { formatTime } from "@/lib/media-data";
 import { syncSongSource } from "@/lib/audio-player";
 import { useMediaStore } from "@/lib/media-store";
+import { SongActionMenu, type SongLike } from "@/components/SongActionMenu";
+import { EqualizerSheet, SleepTimerSheet } from "@/components/PlayerTools";
 
 export const Route = createFileRoute("/music/$id")({
   component: NowPlaying,
