@@ -85,10 +85,30 @@ const loadRenamedMap = (): Record<string, string> => {
   }
 };
 
+const loadRenamedSongMap = (): Record<string, string> => {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(localStorage.getItem(LS_RENAMED_S) || "{}");
+  } catch {
+    return {};
+  }
+};
+
+const loadPlaylist = (): Set<string> => {
+  if (typeof window === "undefined") return new Set();
+  try {
+    return new Set(JSON.parse(localStorage.getItem(LS_PLAYLIST) || "[]"));
+  } catch {
+    return new Set();
+  }
+};
+
 let deletedV = new Set<string>();
 let deletedS = new Set<string>();
 let privacyV = new Set<string>(); // Hidden layout videos state container
 let renamedMap: Record<string, string> = {}; // Video id to custom title map
+let renamedSongMap: Record<string, string> = {}; // Song id to custom title map
+let playlist = new Set<string>(); // Default playlist song ids
 let hydratedFromStorage = false;
 let mediaHydrated = false;
 
