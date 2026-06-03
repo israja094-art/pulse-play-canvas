@@ -129,7 +129,8 @@ const computeState = (): State => {
   
   const ns = getNativeSongs().map(song => {
     const cached = nativeDurationCache.get(song.id);
-    return cached ? { ...song, duration: cached.duration } : song;
+    const title = renamedSongMap[song.id] || song.title;
+    return cached ? { ...song, title, duration: cached.duration } : { ...song, title };
   });
 
   // Base list filter mapping with privacy state filter
@@ -137,9 +138,13 @@ const computeState = (): State => {
     (v) => !deletedV.has(v.id) && !privacyV.has(v.id)
   );
 
+  const allSongs = [...ns, ...userSongs, ...defaultSongs.filter((s) => !deletedS.has(s.id))].map(
+    (s) => (renamedSongMap[s.id] ? { ...s, title: renamedSongMap[s.id] } : s),
+  );
+
   return {
     videos: allVideos,
-    songs: [...ns, ...userSongs, ...defaultSongs.filter((s) => !deletedS.has(s.id))],
+    songs: allSongs,
   };
 };
 
