@@ -214,6 +214,23 @@ function NowPlaying() {
               {nextSong ? <span className="truncate rounded-full border border-border/60 bg-card/45 px-3 py-1.5">Next: {nextSong.title}</span> : null}
             </div>
 
+            <div className="mt-3 flex items-center gap-2">
+              <button
+                onClick={() => setEqOpen(true)}
+                className="flex flex-1 items-center justify-center gap-2 rounded-full border border-border/60 bg-card/50 py-2.5 text-xs font-medium text-foreground active:bg-secondary"
+              >
+                <SlidersHorizontal className="h-4 w-4 text-primary" />
+                Mixing
+              </button>
+              <button
+                onClick={() => setSleepOpen(true)}
+                className="flex flex-1 items-center justify-center gap-2 rounded-full border border-border/60 bg-card/50 py-2.5 text-xs font-medium text-foreground active:bg-secondary"
+              >
+                <Moon className="h-4 w-4 text-primary" />
+                Sleep
+              </button>
+            </div>
+
             <div className="mt-5">
               <div className="relative h-2 rounded-full bg-secondary/90">
                 <div className="absolute left-0 top-0 h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
