@@ -164,6 +164,7 @@ function NowPlaying() {
           <p className="text-[11px] text-muted-foreground">{song.artist}</p>
         </div>
         <button
+          onClick={() => setMenuOpen(true)}
           aria-label="More"
           className="flex h-11 w-11 items-center justify-center rounded-full border border-border/60 bg-background/55 backdrop-blur"
         >
