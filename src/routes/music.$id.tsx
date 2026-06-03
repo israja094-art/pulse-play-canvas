@@ -174,22 +174,23 @@ function NowPlaying() {
 
       <div className="relative z-10 flex-1 px-5 pb-4 pt-3 overflow-hidden">
         <div className="flex h-full flex-col gap-5 overflow-hidden rounded-[2rem] border border-border/60 bg-card/25 px-4 py-4 backdrop-blur-sm">
-          <div className="relative aspect-square w-full overflow-hidden rounded-[1.6rem] border border-border/60 bg-card/70 shadow-2xl shadow-primary/10 max-h-[42vh] flex-shrink-0">
-          <img src={song.cover} alt={song.title} className="h-full w-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-background/55 via-transparent to-transparent" />
-          <div className="absolute left-4 right-4 bottom-4 flex items-center justify-between rounded-2xl border border-border/60 bg-background/55 px-4 py-3 backdrop-blur-md">
-            <div className="min-w-0">
-              <p className="truncate text-xs uppercase tracking-[0.22em] text-muted-foreground">Now playing</p>
-              <p className="truncate text-sm font-semibold text-foreground">{song.duration || formatTime(duration)}</p>
+          <div className="relative flex-shrink-0 overflow-hidden rounded-[1.6rem] border border-border/60 bg-gradient-to-br from-primary/25 via-card/70 to-accent/20 px-5 py-6 shadow-2xl shadow-primary/10">
+            <div className="flex items-center justify-between gap-4">
+              <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-accent shadow-lg shadow-primary/30">
+                <Music2 className="h-8 w-8 text-primary-foreground" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs uppercase tracking-[0.22em] text-muted-foreground">Now playing</p>
+                <p className="truncate text-sm font-semibold text-foreground">{song.duration || formatTime(duration)}</p>
+              </div>
+              <button
+                onClick={() => setLiked((l) => !l)}
+                aria-label="Like"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-card/80 text-foreground"
+              >
+                <Heart className={`h-6 w-6 ${liked ? "fill-primary text-primary" : "text-foreground"}`} />
+              </button>
             </div>
-            <button
-              onClick={() => setLiked((l) => !l)}
-              aria-label="Like"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-card/80 text-foreground"
-            >
-              <Heart className={`h-6 w-6 ${liked ? "fill-primary text-primary" : "text-foreground"}`} />
-            </button>
-          </div>
           </div>
 
           <div className="relative z-10 flex min-h-0 flex-1 flex-col justify-end">
