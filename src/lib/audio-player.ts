@@ -47,3 +47,40 @@ export const playSongNow = (song: AudioSong) => {
 };
 
 export const getActiveSongId = () => activeSongId;
+
+// ===== Sleep timer (auto-stop playback) =====
+let sleepTimer: ReturnType<typeof setTimeout> | null = null;
+let sleepEndsAt: number | null = null;
+const sleepListeners = new Set<() => void>();
+
+const emitSleep = () => sleepListeners.forEach((l) => l());
+
+export const onSleepChange = (l: () => void) => {
+  sleepListeners.add(l);
+  return () => sleepListeners.delete(l);
+};
+
+export const cancelSleepTimer = () => {
+  if (sleepTimer) clearTimeout(sleepTimer);
+  sleepTimer = null;
+  sleepEndsAt = null;
+  emitSleep();
+};
+
+export const setSleepTimer = (minutes: number) => {
+  if (sleepTimer) clearTimeout(sleepTimer);
+  if (!minutes || minutes <= 0) {
+    cancelSleepTimer();
+    return;
+  }
+  sleepEndsAt = Date.now() + minutes * 60000;
+  sleepTimer = setTimeout(() => {
+    getSharedAudio()?.pause();
+    sleepTimer = null;
+    sleepEndsAt = null;
+    emitSleep();
+  }, minutes * 60000);
+  emitSleep();
+};
+
+export const getSleepEndsAt = () => sleepEndsAt;

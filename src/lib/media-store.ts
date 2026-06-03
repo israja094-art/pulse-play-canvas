@@ -38,6 +38,8 @@ const LS_DELETED_V = "zabplay.deleted.videos";
 const LS_DELETED_S = "zabplay.deleted.songs";
 const LS_PRIVACY_V = "zabplay.privacy.videos"; // Privacy hidden videos storage track
 const LS_RENAMED_V = "zabplay.renamed.videos"; // Custom renamed native/default videos tracker
+const LS_RENAMED_S = "zabplay.renamed.songs"; // Custom renamed songs tracker
+const LS_PLAYLIST = "zabplay.playlist.default"; // Default playlist song ids
 const LS_PRIVACY_PIN = "zabplay.privacy.pin"; // 6-digit numeric pin saver
 const DB_NAME = "zabplay-media-db";
 const DB_VERSION = 1;
@@ -83,10 +85,30 @@ const loadRenamedMap = (): Record<string, string> => {
   }
 };
 
+const loadRenamedSongMap = (): Record<string, string> => {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(localStorage.getItem(LS_RENAMED_S) || "{}");
+  } catch {
+    return {};
+  }
+};
+
+const loadPlaylist = (): Set<string> => {
+  if (typeof window === "undefined") return new Set();
+  try {
+    return new Set(JSON.parse(localStorage.getItem(LS_PLAYLIST) || "[]"));
+  } catch {
+    return new Set();
+  }
+};
+
 let deletedV = new Set<string>();
 let deletedS = new Set<string>();
 let privacyV = new Set<string>(); // Hidden layout videos state container
 let renamedMap: Record<string, string> = {}; // Video id to custom title map
+let renamedSongMap: Record<string, string> = {}; // Song id to custom title map
+let playlist = new Set<string>(); // Default playlist song ids
 let hydratedFromStorage = false;
 let mediaHydrated = false;
 
@@ -107,7 +129,8 @@ const computeState = (): State => {
   
   const ns = getNativeSongs().map(song => {
     const cached = nativeDurationCache.get(song.id);
-    return cached ? { ...song, duration: cached.duration } : song;
+    const title = renamedSongMap[song.id] || song.title;
+    return cached ? { ...song, title, duration: cached.duration } : { ...song, title };
   });
 
   // Base list filter mapping with privacy state filter
@@ -115,9 +138,13 @@ const computeState = (): State => {
     (v) => !deletedV.has(v.id) && !privacyV.has(v.id)
   );
 
+  const allSongs = [...ns, ...userSongs, ...defaultSongs.filter((s) => !deletedS.has(s.id))].map(
+    (s) => (renamedSongMap[s.id] ? { ...s, title: renamedSongMap[s.id] } : s),
+  );
+
   return {
     videos: allVideos,
-    songs: [...ns, ...userSongs, ...defaultSongs.filter((s) => !deletedS.has(s.id))],
+    songs: allSongs,
   };
 };
 
@@ -277,6 +304,8 @@ const subscribe = (l: () => void) => {
     deletedS = loadDeleted(LS_DELETED_S);
     privacyV = loadDeleted(LS_PRIVACY_V); // Loading secure privacy entries
     renamedMap = loadRenamedMap(); // Loading active custom titles map
+    renamedSongMap = loadRenamedSongMap(); // Loading active song custom titles
+    playlist = loadPlaylist(); // Loading default playlist
     queueMicrotask(() => emit());
     void hydratePersistedMedia();
     
@@ -552,4 +581,40 @@ export const shareItems = async (items: { id?: string; title: string; src: strin
     console.error("Error while handling capacitor native sharing:", error);
   }
 };
+
+// 🔥 REAL WORKING FEATURE: RENAME SONG ENGINE
+export const renameSong = async (id: string, newTitle: string) => {
+  if (!newTitle.trim()) return;
+  renamedSongMap[id] = newTitle.trim();
+  localStorage.setItem(LS_RENAMED_S, JSON.stringify(renamedSongMap));
+
+  const userIdx = userSongs.findIndex((s) => s.id === id);
+  if (userIdx >= 0) {
+    userSongs[userIdx].title = newTitle.trim();
+    const dbSongs = await readAll<PersistedSong>(SONG_STORE);
+    const target = dbSongs.find((s) => s.id === id);
+    if (target) {
+      target.title = newTitle.trim();
+      await putOne<PersistedSong>(SONG_STORE, target);
+    }
+  }
+  emit();
+};
+
+// 🔥 REAL WORKING FEATURE: ADD SONGS TO DEFAULT PLAYLIST
+export const addToPlaylist = (ids: string[]) => {
+  for (const id of ids) playlist.add(id);
+  localStorage.setItem(LS_PLAYLIST, JSON.stringify([...playlist]));
+  emit();
+};
+
+export const removeFromPlaylist = (ids: string[]) => {
+  for (const id of ids) playlist.delete(id);
+  localStorage.setItem(LS_PLAYLIST, JSON.stringify([...playlist]));
+  emit();
+};
+
+export const isInPlaylist = (id: string) => playlist.has(id);
+export const getPlaylistIds = () => [...playlist];
+
 
