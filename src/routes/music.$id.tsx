@@ -277,6 +277,16 @@ function NowPlaying() {
           </div>
         </div>
       </div>
+
+      {menuOpen && (
+        <SongActionMenu
+          song={{ id: song.id, title: song.title, artist: song.artist, src: song.src } as SongLike}
+          onClose={() => setMenuOpen(false)}
+          onPlay={() => audioRef.current?.play().catch(() => {})}
+        />
+      )}
+      {eqOpen && <EqualizerSheet onClose={() => setEqOpen(false)} />}
+      {sleepOpen && <SleepTimerSheet onClose={() => setSleepOpen(false)} />}
     </div>
   );
 }
