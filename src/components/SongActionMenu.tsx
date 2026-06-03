@@ -104,7 +104,7 @@ export function SongActionMenu({
       <p className="truncate px-4 pb-2 text-sm font-semibold text-foreground">{song.title}</p>
       <div className="space-y-0.5">
         <Item
-          icon={<Play className="h-4.5 w-4.5" />}
+          icon={<Play className="h-5 w-5" />}
           label="Play now"
           onClick={() => {
             onPlay();
@@ -112,12 +112,12 @@ export function SongActionMenu({
           }}
         />
         <Item
-          icon={<Pencil className="h-4.5 w-4.5" />}
+          icon={<Pencil className="h-5 w-5" />}
           label="Rename"
           onClick={() => setRenaming(true)}
         />
         <Item
-          icon={inPlaylist ? <Check className="h-4.5 w-4.5" /> : <ListPlus className="h-4.5 w-4.5" />}
+          icon={inPlaylist ? <Check className="h-5 w-5" /> : <ListPlus className="h-5 w-5" />}
           label={inPlaylist ? "Remove from playlist" : "Add to playlist"}
           onClick={() => {
             if (inPlaylist) removeFromPlaylist([song.id]);
@@ -126,7 +126,7 @@ export function SongActionMenu({
           }}
         />
         <Item
-          icon={<Share2 className="h-4.5 w-4.5" />}
+          icon={<Share2 className="h-5 w-5" />}
           label="Share"
           onClick={() => {
             shareItems([{ id: song.id, title: song.title, src: song.src }]);
@@ -134,7 +134,7 @@ export function SongActionMenu({
           }}
         />
         <Item
-          icon={<Trash2 className="h-4.5 w-4.5" />}
+          icon={<Trash2 className="h-5 w-5" />}
           label="Delete"
           danger
           onClick={() => {
