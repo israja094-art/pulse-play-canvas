@@ -65,7 +65,12 @@ export function EqualizerSheet({ onClose }: { onClose: () => void }) {
 export function SleepTimerSheet({ onClose }: { onClose: () => void }) {
   const [endsAt, setEndsAt] = useState<number | null>(getSleepEndsAt());
 
-  useEffect(() => onSleepChange(() => setEndsAt(getSleepEndsAt())), []);
+  useEffect(() => {
+    const off = onSleepChange(() => setEndsAt(getSleepEndsAt()));
+    return () => {
+      off();
+    };
+  }, []);
 
   const options = [5, 10, 15, 30, 45, 60];
   const remaining = endsAt ? Math.max(0, Math.round((endsAt - Date.now()) / 60000)) : 0;
