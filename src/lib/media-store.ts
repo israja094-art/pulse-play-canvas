@@ -582,3 +582,39 @@ export const shareItems = async (items: { id?: string; title: string; src: strin
   }
 };
 
+// 🔥 REAL WORKING FEATURE: RENAME SONG ENGINE
+export const renameSong = async (id: string, newTitle: string) => {
+  if (!newTitle.trim()) return;
+  renamedSongMap[id] = newTitle.trim();
+  localStorage.setItem(LS_RENAMED_S, JSON.stringify(renamedSongMap));
+
+  const userIdx = userSongs.findIndex((s) => s.id === id);
+  if (userIdx >= 0) {
+    userSongs[userIdx].title = newTitle.trim();
+    const dbSongs = await readAll<PersistedSong>(SONG_STORE);
+    const target = dbSongs.find((s) => s.id === id);
+    if (target) {
+      target.title = newTitle.trim();
+      await putOne<PersistedSong>(SONG_STORE, target);
+    }
+  }
+  emit();
+};
+
+// 🔥 REAL WORKING FEATURE: ADD SONGS TO DEFAULT PLAYLIST
+export const addToPlaylist = (ids: string[]) => {
+  for (const id of ids) playlist.add(id);
+  localStorage.setItem(LS_PLAYLIST, JSON.stringify([...playlist]));
+  emit();
+};
+
+export const removeFromPlaylist = (ids: string[]) => {
+  for (const id of ids) playlist.delete(id);
+  localStorage.setItem(LS_PLAYLIST, JSON.stringify([...playlist]));
+  emit();
+};
+
+export const isInPlaylist = (id: string) => playlist.has(id);
+export const getPlaylistIds = () => [...playlist];
+
+
