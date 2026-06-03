@@ -304,6 +304,8 @@ const subscribe = (l: () => void) => {
     deletedS = loadDeleted(LS_DELETED_S);
     privacyV = loadDeleted(LS_PRIVACY_V); // Loading secure privacy entries
     renamedMap = loadRenamedMap(); // Loading active custom titles map
+    renamedSongMap = loadRenamedSongMap(); // Loading active song custom titles
+    playlist = loadPlaylist(); // Loading default playlist
     queueMicrotask(() => emit());
     void hydratePersistedMedia();
     
