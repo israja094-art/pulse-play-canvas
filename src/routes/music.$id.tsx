@@ -36,6 +36,9 @@ function NowPlaying() {
   const [liked, setLiked] = useState(false);
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [eqOpen, setEqOpen] = useState(false);
+  const [sleepOpen, setSleepOpen] = useState(false);
 
   const idx = Math.max(0, songs.findIndex((s) => s.id === id));
   const song = songs[idx];
