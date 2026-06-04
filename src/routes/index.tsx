@@ -642,40 +642,40 @@ function Index() {
               </p>
             </div>
             
-            {/* Real Transparent Input (Fixed height & click priority layout) */}
-            <div className="relative w-full max-w-[210px] mx-auto h-12 mt-2 pointer-events-auto">
-              <input 
+            {/* Visible, reliable PIN input + box indicators */}
+            <div className="w-full max-w-[210px] mx-auto mt-2 space-y-3">
+              <input
                 ref={pinInputRef}
-                type="text" 
+                type="tel"
                 maxLength={4}
                 pattern="[0-9]*"
                 inputMode="numeric"
+                autoComplete="off"
                 value={inputPin}
-                onChange={(e) => setInputPin(e.target.value.replace(/\D/g, ""))}
-                className="absolute inset-0 w-full h-full opacity-0 z-50 cursor-pointer text-center pointer-events-auto"
-                autoFocus
+                onChange={(e) => setInputPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && inputPin.length === 4) handlePinSubmit();
+                }}
+                placeholder="••••"
+                className="w-full h-12 rounded-xl border border-white/15 bg-white/[0.06] text-center text-2xl font-bold tracking-[0.6em] text-white placeholder:text-white/25 outline-none focus:border-primary focus:bg-primary/10 transition-all"
               />
 
-              {/* ✨ MODERNISED SQUARE BOXES DESIGN */}
-              <div className="absolute inset-0 flex justify-between items-center gap-3 z-10 pointer-events-none">
+              {/* Box indicators (display only) */}
+              <div className="flex justify-between items-center gap-3 pointer-events-none">
                 {[0, 1, 2, 3].map((index) => {
                   const isFocused = inputPin.length === index;
                   const hasValue = inputPin.length > index;
                   return (
-                    <div 
-                      key={index} 
-                      className={`w-11 h-11 rounded-xl border flex items-center justify-center transition-all duration-200 ${
-                        isFocused 
-                          ? "border-primary bg-primary/10 shadow-[0_0_12px_rgba(var(--primary),0.3)] scale-105" 
-                          : "border-white/10 bg-white/[0.03]"
+                    <div
+                      key={index}
+                      className={`w-11 h-3 rounded-full border transition-all duration-200 ${
+                        hasValue
+                          ? "border-primary bg-primary"
+                          : isFocused
+                            ? "border-primary bg-primary/20"
+                            : "border-white/10 bg-white/[0.03]"
                       }`}
-                    >
-                      {hasValue ? (
-                        <span className="text-white text-sm font-bold">{inputPin[index]}</span>
-                      ) : (
-                        <span className="w-1.5 h-1.5 rounded-full bg-white/20" />
-                      )}
-                    </div>
+                    />
                   );
                 })}
               </div>
