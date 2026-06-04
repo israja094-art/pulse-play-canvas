@@ -32,6 +32,7 @@ import {
   moveVideosToPrivacy,
   getPrivacyVideos,
 } from "@/lib/media-store";
+import { showNativeAlert, showNativeConfirm, showNativePrompt } from "@/lib/native-dialog";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -77,10 +78,6 @@ function Index() {
   const [watchingHistory, setWatchingHistory] = useState<HistoryItem[]>([]);
 
   // --- POPUPS & DIALOGS REAL STATES ---
-  const [showRenameModal, setShowRenameModal] = useState(false);
-  const [renameTargetId, setRenameTargetId] = useState<string | null>(null);
-  const [newTitleValue, setNewTitleValue] = useState("");
-  
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [privacyVideosList, setPrivacyVideosList] = useState<any[]>([]);
 
@@ -88,12 +85,7 @@ function Index() {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   // --- 🔐 SECURITY PASSWORD SYSTEM STATES ---
-  const [showPinModal, setShowPinModal] = useState(false);
-  const [pinMode, setPinMode] = useState<"setup" | "unlock_hide" | "unlock_view">("setup");
-  const [inputPin, setInputPin] = useState("");
   const [savedPin, setSavedPin] = useState<string | null>(null);
-  
-  const pinInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const pin = localStorage.getItem("zabplay_privacy_pin");
@@ -101,14 +93,6 @@ function Index() {
       setSavedPin(pin);
     }
   }, []);
-
-  useEffect(() => {
-    if (showPinModal) {
-      setTimeout(() => {
-        pinInputRef.current?.focus();
-      }, 150);
-    }
-  }, [showPinModal]);
 
   useEffect(() => {
     const loadHistory = () => {
@@ -286,10 +270,24 @@ function Index() {
     setSelected(new Set());
   };
 
-  const onDelete = () => {
+  const onDelete = async () => {
     if (selected.size === 0) return;
-    if (confirm(`Delete ${selected.size} video(s)?`)) {
-      deleteVideos([...selected]);
+    const ok = await showNativeConfirm(
+      "Delete video",
+      `Gallery se ${selected.size} video permanently delete karna hai?`,
+      "Delete",
+      "Cancel",
+    );
+    if (ok) {
+      try {
+        await deleteVideos([...selected]);
+      } catch {
+        await showNativeAlert(
+          "Delete failed",
+          "Android ne is file ko direct remove nahi kiya. Naya APK install karke permission allow karo, phir dobara try karo.",
+        );
+        return;
+      }
       exitSelect();
     }
   };
@@ -303,131 +301,123 @@ function Index() {
     exitSelect();
   };
 
-  const onPrivacySecure = () => {
-    if (selected.size === 0) return;
-    setInputPin("");
-    if (!savedPin) {
-      setPinMode("setup");
-    } else {
-      setPinMode("unlock_hide");
+  const requestPin = async (
+    title: string,
+    message: string,
+    initialValue = "",
+  ) => {
+    const result = await showNativePrompt({
+      title,
+      message,
+      placeholder: "4-digit PIN",
+      initialValue,
+      okText: "Confirm",
+      cancelText: "Cancel",
+    });
+
+    const pin = result.value.replace(/\D/g, "").slice(0, 4);
+    if (result.cancelled) return null;
+    if (pin.length !== 4) {
+      await showNativeAlert("Invalid PIN", "Please enter a valid 4-digit PIN.");
+      return null;
     }
-    setShowPinModal(true);
+    return pin;
   };
 
-  const executePrivacyLock = () => {
-    moveVideosToPrivacy([...selected]);
-    alert(`${selected.size} Video(s) successfully locked in Privacy Folder!`);
-    exitSelect();
+  const onPrivacySecure = async () => {
+    if (selected.size === 0) return;
+    if (!savedPin) {
+      const pin = await requestPin("Set Privacy PIN", "4-digit PIN set karo taaki videos hide ho saken.");
+      if (!pin) return;
+      localStorage.setItem("zabplay_privacy_pin", pin);
+      setSavedPin(pin);
+      moveVideosToPrivacy([...selected]);
+      await showNativeAlert("Privacy enabled", `${selected.size} video privacy folder me move ho gaye.`);
+      exitSelect();
+    } else {
+      const pin = await requestPin("Enter Privacy PIN", "Hidden folder me bhejne ke liye PIN enter karo.");
+      if (!pin) return;
+      if (pin !== savedPin) {
+        await showNativeAlert("Wrong PIN", "Incorrect PIN. Please try again.");
+        return;
+      }
+      moveVideosToPrivacy([...selected]);
+      await showNativeAlert("Privacy enabled", `${selected.size} video privacy folder me move ho gaye.`);
+      exitSelect();
+    }
   };
 
-  const onRename = () => {
+  const onRename = async () => {
     if (selected.size === 0) return;
     const firstId = Array.from(selected)[0];
     const itemToRename = videos.find(v => v.id === firstId);
     if (itemToRename) {
-      setRenameTargetId(firstId);
-      setNewTitleValue(itemToRename.title);
-      setShowRenameModal(true);
-    }
-  };
-
-  const saveRenameAction = async () => {
-    if (renameTargetId && newTitleValue.trim()) {
-      await renameVideoFile(renameTargetId, newTitleValue.trim());
-      setShowRenameModal(false);
+      const result = await showNativePrompt({
+        title: "Rename video",
+        message: "Naya naam likho.",
+        initialValue: itemToRename.title,
+        placeholder: "Video name",
+        okText: "Save",
+        cancelText: "Cancel",
+      });
+      if (result.cancelled) return;
+      const ok = await renameVideoFile(firstId, result.value);
+      if (!ok) {
+        await showNativeAlert(
+          "Rename failed",
+          "Android ne gallery file rename allow nahi kiya. Naya APK install karke permission allow karo, phir dobara try karo.",
+        );
+        return;
+      }
       exitSelect();
     }
   };
 
   const onFileTransfer = () => {
     if (selected.size === 0) return;
-    alert(`Transferring ${selected.size} video file(s)...`);
+      void showNativeAlert("File Transfer", `${selected.size} video file(s) transfer feature jaldi add hogi.`);
     exitSelect();
   };
 
   const onVideoCut = () => {
     if (selected.size === 0) return;
-    alert("Opening Video Cutter tool for selected file.");
+    void showNativeAlert("Cut Video", "Video cutter tool abhi open nahi kiya gaya hai.");
     exitSelect();
   };
 
   const handleDropdownAction = async (actionName: string) => {
     if (actionName === "Settings") {
-      alert(`Opening feature: ${actionName}`);
+      void showNativeAlert(actionName, `${actionName} feature abhi available nahi hai.`);
     } else if (actionName === "File Transfer") {
-      alert(`Opening feature: ${actionName}`);
+      void showNativeAlert(actionName, `${actionName} feature abhi available nahi hai.`);
     } else if (actionName === "MP3 Converter") {
-      alert(`Opening feature: ${actionName}`);
+      void showNativeAlert(actionName, `${actionName} feature abhi available nahi hai.`);
     } else if (actionName === "Storage Info") {
       setShowStorageModal(true);
     } else if (actionName === "History") {
       setShowHistoryModal(true);
     } else if (actionName === "Privacy Folder") {
-      setInputPin("");
       if (!savedPin) {
-        setPinMode("setup");
+        const pin = await requestPin("Set Privacy PIN", "Pehle privacy folder ke liye 4-digit PIN set karo.");
+        if (!pin) return;
+        localStorage.setItem("zabplay_privacy_pin", pin);
+        setSavedPin(pin);
       } else {
-        setPinMode("unlock_view");
+        const pin = await requestPin("Enter Privacy PIN", "Privacy folder dekhne ke liye PIN enter karo.");
+        if (!pin) return;
+        if (pin !== savedPin) {
+          await showNativeAlert("Wrong PIN", "Incorrect PIN. Please try again.");
+          return;
+        }
       }
-      setShowPinModal(true);
-    }
-  };
-
-  // 🔥 ADVANCED PROFESSIONAL NON-BLOCKING PIN ENGINE
-  const handlePinSubmit = () => {
-    if (inputPin.length !== 4) {
-      alert("Please enter a valid 4-digit PIN.");
-      return;
-    }
-
-    // 1. Keyboard ko sabse pehle niche bitha do taaki input lock na phase
-    if (document.activeElement instanceof HTMLElement) {
-      document.activeElement.blur();
-    }
-
-    if (pinMode === "setup") {
-      // Setup direct close bina spinner lagaye
-      localStorage.setItem("zabplay_privacy_pin", inputPin);
-      setSavedPin(inputPin);
-      setShowPinModal(false);
-      setTimeout(() => {
-        alert("Privacy PIN successfully set!");
-      }, 100);
-
-    } else if (pinMode === "unlock_hide") {
-      if (inputPin === savedPin) {
-        // Pehle modal gayab karo taaki UI freeze na lage
-        setShowPinModal(false);
-        // Chupchaap next micro-task me file operation run karo
-        setTimeout(() => {
-          executePrivacyLock();
-        }, 150);
-      } else {
-        alert("Incorrect PIN! Please try again.");
-        setInputPin("");
-        setTimeout(() => pinInputRef.current?.focus(), 100);
-      }
-
-    } else if (pinMode === "unlock_view") {
-      if (inputPin === savedPin) {
-        // Modal turant band karo
-        setShowPinModal(false);
-        // Background non-blocking execution
-        setTimeout(async () => {
-          try {
-            const data = await getPrivacyVideos();
-            setPrivacyVideosList(data || []);
-            setShowPrivacyModal(true);
-          } catch (err) {
-            console.error("Native storage read crash protected:", err);
-            setPrivacyVideosList([]);
-            setShowPrivacyModal(true);
-          }
-        }, 150);
-      } else {
-        alert("Incorrect PIN! Please try again.");
-        setInputPin("");
-        setTimeout(() => pinInputRef.current?.focus(), 100);
+      try {
+        const data = await getPrivacyVideos();
+        setPrivacyVideosList(data || []);
+        setShowPrivacyModal(true);
+      } catch (err) {
+        console.error("Native storage read crash protected:", err);
+        setPrivacyVideosList([]);
+        setShowPrivacyModal(true);
       }
     }
   };
@@ -613,119 +603,6 @@ function Index() {
         </div>
       ) : (
         contentLayout
-      )}
-
-      {/* --- 🔐 PREMIUM FIXED MODAL: PRIVACY PIN SETUP & UNLOCK ENGINE --- */}
-      {showPinModal && (
-        <div 
-          className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-[99999] pointer-events-auto"
-          onClick={() => pinInputRef.current?.focus()}
-        >
-          <div 
-            className="bg-[#0b1220] w-[290px] rounded-[24px] p-6 border border-white/10 shadow-2xl text-center relative space-y-5 pointer-events-auto"
-            onClick={(e) => {
-              e.stopPropagation();
-              pinInputRef.current?.focus();
-            }}
-          >
-            <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto">
-              <Lock className="h-5 w-5" />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-white tracking-wide">
-                {pinMode === "setup" ? "Set Privacy Password" : "Enter Privacy PIN"}
-              </h3>
-              <p className="text-xs text-slate-400 mt-1 px-2">
-                {pinMode === "setup" 
-                  ? "Create a 4-digit PIN to secure your hidden videos" 
-                  : "Please enter verification code to continue"}
-              </p>
-            </div>
-            
-            {/* Visible, reliable PIN input + box indicators */}
-            <div className="w-full max-w-[210px] mx-auto mt-2 space-y-3">
-              <input
-                ref={pinInputRef}
-                type="tel"
-                maxLength={4}
-                pattern="[0-9]*"
-                inputMode="numeric"
-                autoComplete="off"
-                value={inputPin}
-                onChange={(e) => setInputPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && inputPin.length === 4) handlePinSubmit();
-                }}
-                placeholder="••••"
-                className="w-full h-12 rounded-xl border border-white/15 bg-white/[0.06] text-center text-2xl font-bold tracking-[0.6em] text-white placeholder:text-white/25 outline-none focus:border-primary focus:bg-primary/10 transition-all"
-              />
-
-              {/* Box indicators (display only) */}
-              <div className="flex justify-between items-center gap-3 pointer-events-none">
-                {[0, 1, 2, 3].map((index) => {
-                  const isFocused = inputPin.length === index;
-                  const hasValue = inputPin.length > index;
-                  return (
-                    <div
-                      key={index}
-                      className={`w-11 h-3 rounded-full border transition-all duration-200 ${
-                        hasValue
-                          ? "border-primary bg-primary"
-                          : isFocused
-                            ? "border-primary bg-primary/20"
-                            : "border-white/10 bg-white/[0.03]"
-                      }`}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Premium Flat Buttons Layout */}
-            <div className="flex gap-3 text-xs font-semibold pt-2 relative z-[99999] pointer-events-auto">
-              <button 
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowPinModal(false);
-                }} 
-                className="flex-1 py-3 rounded-xl bg-white/[0.05] text-white/90 active:bg-white/10 transition-colors cursor-pointer pointer-events-auto"
-              >
-                Cancel
-              </button>
-              <button 
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handlePinSubmit();
-                }} 
-                disabled={inputPin.length !== 4}
-                className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground disabled:opacity-30 disabled:pointer-events-none active:scale-95 transition-transform font-bold cursor-pointer pointer-events-auto"
-              >
-                Confirm
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* --- REAL MODAL: RENAME POPUP ENGINE --- */}
-      {showRenameModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-background w-full max-w-xs rounded-2xl p-4 border border-border/80 shadow-2xl space-y-3">
-            <h3 className="text-sm font-bold text-foreground">Rename Video</h3>
-            <input 
-              type="text" 
-              value={newTitleValue}
-              onChange={(e) => setNewTitleValue(e.target.value)}
-              className="w-full bg-secondary px-3 py-2 text-sm rounded-xl border border-border/40 focus:outline-none focus:border-primary"
-            />
-            <div className="flex gap-2 justify-end text-xs font-semibold">
-              <button onClick={() => setShowRenameModal(false)} className="px-3 py-2 rounded-lg bg-secondary text-foreground">Cancel</button>
-              <button onClick={saveRenameAction} className="px-3 py-2 rounded-lg bg-primary text-primary-foreground">Save</button>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* --- REAL MODAL: PRIVACY FOLDER VIEWER --- */}
