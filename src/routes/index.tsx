@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useRef, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   CheckCircle2,
   Circle,
@@ -463,8 +463,12 @@ function Index() {
             <div className="flex items-center justify-between h-10">
               <Logo />
               <div className="flex items-center gap-1 relative">
-                <button
-                  onClick={() => setShowSearchInput(!showSearchInput)}
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowSearchInput((prev) => !prev);
+                    }}
                   className={`p-2 rounded-full transition-colors ${showSearchInput ? "bg-primary/20 text-primary" : "text-foreground/80 active:bg-secondary"}`}
                   aria-label="Toggle search input"
                 >
