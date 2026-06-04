@@ -57,7 +57,10 @@ jobs:
           MANIFEST=android/app/src/main/AndroidManifest.xml
           # Insert permissions just after the opening <manifest> tag (only if missing)
           if ! grep -q "READ_MEDIA_VIDEO" "$MANIFEST"; then
-            sed -i 's|<manifest |<manifest |; /<manifest /a\    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>\n    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>\n    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>\n    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>' "$MANIFEST"
+            sed -i 's|<manifest |<manifest |; /<manifest /a\    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"/>\n    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>\n    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>\n    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>' "$MANIFEST"
+          fi
+          if ! grep -q "requestLegacyExternalStorage" "$MANIFEST"; then
+            sed -i 's|<application |<application android:requestLegacyExternalStorage="true" |' "$MANIFEST"
           fi
           cat "$MANIFEST"
 

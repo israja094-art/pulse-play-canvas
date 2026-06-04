@@ -4,6 +4,7 @@ import { ArrowLeft, MoreVertical, Trash2, Play, AudioLines, Share2 } from "lucid
 import { useMediaStore, deleteVideos, shareItems } from "@/lib/media-store";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import { BottomTabs } from "@/components/BottomTabs";
+import { showNativeAlert, showNativeConfirm } from "@/lib/native-dialog";
 
 export const Route = createFileRoute("/video/$id")({
   component: VideoPage,
@@ -163,8 +164,27 @@ function VideoPage() {
                     <Share2 className="h-4 w-4" /> Share
                   </button>
                   <button
-                    onClick={() => {
-                      deleteVideos([v.id]);
+                    onClick={async () => {
+                      const ok = await showNativeConfirm(
+                        "Delete video",
+                        `"${v.title}" ko gallery se permanently delete karna hai?`,
+                        "Delete",
+                        "Cancel",
+                      );
+                      if (!ok) {
+                        setOpenMenu(null);
+                        return;
+                      }
+                      try {
+                        await deleteVideos([v.id]);
+                      } catch {
+                        await showNativeAlert(
+                          "Delete failed",
+                          "Android ne is file ko direct remove nahi kiya. Naya APK install karke permission allow karo, phir dobara try karo.",
+                        );
+                        setOpenMenu(null);
+                        return;
+                      }
                       setOpenMenu(null);
                       if (v.id === current.id) {
                         const remaining = list.filter((x) => x.id !== v.id);

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Play, Pencil, ListPlus, Share2, Trash2, Check } from "lucide-react";
 import {
@@ -9,6 +9,7 @@ import {
   isInPlaylist,
   shareItems,
 } from "@/lib/media-store";
+import { showNativeConfirm, showNativePrompt } from "@/lib/native-dialog";
 
 export type SongLike = { id: string; title: string; artist?: string; src: string };
 
@@ -40,40 +41,7 @@ export function SongActionMenu({
   onClose: () => void;
   onPlay: () => void;
 }) {
-  const [renaming, setRenaming] = useState(false);
-  const [name, setName] = useState(song.title);
   const inPlaylist = isInPlaylist(song.id);
-
-  if (renaming) {
-    return (
-      <Sheet onClose={onClose}>
-        <p className="px-2 pb-3 text-base font-semibold text-foreground">Rename song</p>
-        <input
-          autoFocus
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="w-full rounded-xl border border-border/60 bg-secondary px-4 py-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50"
-        />
-        <div className="mt-3 flex gap-2">
-          <button
-            onClick={onClose}
-            className="flex-1 rounded-xl bg-secondary py-3 text-sm font-medium text-foreground"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => {
-              renameSong(song.id, name);
-              onClose();
-            }}
-            className="flex-1 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground"
-          >
-            Save
-          </button>
-        </div>
-      </Sheet>
-    );
-  }
 
   const Item = ({
     icon,
@@ -114,7 +82,20 @@ export function SongActionMenu({
         <Item
           icon={<Pencil className="h-5 w-5" />}
           label="Rename"
-          onClick={() => setRenaming(true)}
+          onClick={async () => {
+            const result = await showNativePrompt({
+              title: "Rename song",
+              message: "Naya song name likho.",
+              initialValue: song.title,
+              placeholder: "Song name",
+              okText: "Save",
+              cancelText: "Cancel",
+            });
+            if (!result.cancelled) {
+              await renameSong(song.id, result.value);
+            }
+            onClose();
+          }}
         />
         <Item
           icon={inPlaylist ? <Check className="h-5 w-5" /> : <ListPlus className="h-5 w-5" />}
@@ -137,8 +118,14 @@ export function SongActionMenu({
           icon={<Trash2 className="h-5 w-5" />}
           label="Delete"
           danger
-          onClick={() => {
-            if (confirm(`Delete "${song.title}"?`)) {
+          onClick={async () => {
+            const ok = await showNativeConfirm(
+              "Delete song",
+              `"${song.title}" ko list se remove karna hai?`,
+              "Delete",
+              "Cancel",
+            );
+            if (ok) {
               deleteSongs([song.id]);
             }
             onClose();

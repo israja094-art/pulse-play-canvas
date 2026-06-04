@@ -332,49 +332,74 @@ export const useMediaStore = () =>
     () => state,
   );
 
-// Best-effort native gallery file delete (file:// path or relative ExternalStorage path)
-const deleteNativeFile = async (rawPath: string): Promise<boolean> => {
-  try {
-    await Filesystem.deleteFile({ path: rawPath });
-    return true;
-  } catch {
-    // Retry treating it as a path relative to ExternalStorage
-    try {
-      await Filesystem.deleteFile({ path: rawPath, directory: Directory.ExternalStorage });
-      return true;
-    } catch (e) {
-      console.warn("native delete failed", e);
-      return false;
-    }
-  }
+const sanitizeFileTitle = (value: string) => value.replace(/[\\/:*?"<>|]/g, "_").trim();
+
+const normalizeNativePath = (rawPath: string) => {
+  const clean = rawPath.replace(/^file:\/\//, "");
+  const relative = clean.replace(/^\/+storage\/+emulated\/+0\/+/, "").replace(/^\/+sdcard\/+/, "");
+  return {
+    absolute: clean,
+    relative,
+  };
 };
 
-// Best-effort native gallery file rename
-const renameNativeFile = async (rawPath: string, newTitle: string): Promise<boolean> => {
-  try {
-    const lastSlash = rawPath.lastIndexOf("/");
-    if (lastSlash < 0) return false;
-    const dir = rawPath.slice(0, lastSlash);
-    const oldName = rawPath.slice(lastSlash + 1);
-    const dot = oldName.lastIndexOf(".");
-    const ext = dot >= 0 ? oldName.slice(dot) : "";
-    const safe = newTitle.replace(/[\\/:*?"<>|]/g, "_").trim();
-    const to = `${dir}/${safe}${ext}`;
-    if (to === rawPath) return true;
+const deleteNativeFile = async (rawPath: string): Promise<boolean> => {
+  const { absolute, relative } = normalizeNativePath(rawPath);
+  const attempts = [
+    () => Filesystem.deleteFile({ path: absolute }),
+    () => Filesystem.deleteFile({ path: relative, directory: Directory.ExternalStorage }),
+    () => Filesystem.deleteFile({ path: relative, directory: Directory.Documents }),
+  ];
+
+  for (const attempt of attempts) {
     try {
-      await Filesystem.rename({ from: rawPath, to });
+      await attempt();
       return true;
     } catch {
-      await Filesystem.rename({ from: rawPath, to, directory: Directory.ExternalStorage, toDirectory: Directory.ExternalStorage } as any);
-      return true;
+      /* try next path shape */
     }
-  } catch (e) {
-    console.warn("native rename failed", e);
-    return false;
   }
+
+  console.warn("native delete failed", { rawPath, absolute, relative });
+  return false;
+};
+
+const renameNativeFile = async (rawPath: string, newTitle: string): Promise<boolean> => {
+  const { absolute, relative } = normalizeNativePath(rawPath);
+  const source = relative || absolute;
+  const lastSlash = source.lastIndexOf("/");
+  if (lastSlash < 0) return false;
+
+  const dir = source.slice(0, lastSlash);
+  const oldName = source.slice(lastSlash + 1);
+  const dot = oldName.lastIndexOf(".");
+  const ext = dot >= 0 ? oldName.slice(dot) : "";
+  const safe = sanitizeFileTitle(newTitle);
+  if (!safe) return false;
+  const target = `${dir}/${safe}${ext}`;
+  if (target === source) return true;
+
+  const attempts = [
+    () => Filesystem.rename({ from: absolute, to: absolute.replace(/[^/]+$/, `${safe}${ext}`) }),
+    () => Filesystem.rename({ from: source, to: target, directory: Directory.ExternalStorage, toDirectory: Directory.ExternalStorage } as any),
+    () => Filesystem.rename({ from: source, to: target, directory: Directory.Documents, toDirectory: Directory.Documents } as any),
+  ];
+
+  for (const attempt of attempts) {
+    try {
+      await attempt();
+      return true;
+    } catch {
+      /* try next path shape */
+    }
+  }
+
+  console.warn("native rename failed", { rawPath, source, target });
+  return false;
 };
 
 export const deleteVideos = async (ids: string[]) => {
+  let nativeDeleteFailed = false;
   for (const id of ids) {
     const i = userVideos.findIndex((v) => v.id === id);
     if (i >= 0) {
@@ -384,7 +409,11 @@ export const deleteVideos = async (ids: string[]) => {
     } else {
       // Native gallery video: actually remove the underlying file
       if (id.startsWith("nv-")) {
-        await deleteNativeFile(id.replace("nv-", ""));
+        const ok = await deleteNativeFile(id.replace("nv-", ""));
+        if (!ok) {
+          nativeDeleteFailed = true;
+          continue;
+        }
       }
       deletedV.add(id);
     }
@@ -393,6 +422,9 @@ export const deleteVideos = async (ids: string[]) => {
   emit();
   // Re-scan so the gallery list reflects the real filesystem state
   void runNativeScan(true);
+  if (nativeDeleteFailed) {
+    throw new Error("native-delete-failed");
+  }
 };
 
 export const deleteSongs = (ids: string[]) => {
@@ -412,29 +444,34 @@ export const deleteSongs = (ids: string[]) => {
 
 // 🔥 REAL WORKING FEATURE: RENAME VIDEOS ENGINE
 export const renameVideoFile = async (id: string, newTitle: string) => {
-  if (!newTitle.trim()) return;
+  const cleanTitle = sanitizeFileTitle(newTitle);
+  if (!cleanTitle) return false;
 
-  renamedMap[id] = newTitle.trim();
+  renamedMap[id] = cleanTitle;
   localStorage.setItem(LS_RENAMED_V, JSON.stringify(renamedMap));
 
   // Agar user ka manual file imported hai, toh IndexedDB record ko bhi real update karo
   const userIdx = userVideos.findIndex((v) => v.id === id);
   if (userIdx >= 0) {
-    userVideos[userIdx].title = newTitle.trim();
+    userVideos[userIdx].title = cleanTitle;
     const dbVideos = await readAll<PersistedVideo>(VIDEO_STORE);
     const targetData = dbVideos.find(v => v.id === id);
     if (targetData) {
-      targetData.title = newTitle.trim();
+      targetData.title = cleanTitle;
       await putOne<PersistedVideo>(VIDEO_STORE, targetData);
     }
   } else if (id.startsWith("nv-")) {
     // Native gallery video: actually rename the underlying file
-    const ok = await renameNativeFile(id.replace("nv-", ""), newTitle.trim());
+    const ok = await renameNativeFile(id.replace("nv-", ""), cleanTitle);
     emit();
-    if (ok) void runNativeScan(true);
-    return;
+    if (ok) {
+      void runNativeScan(true);
+      return true;
+    }
+    return false;
   }
   emit();
+  return true;
 };
 
 // 🔥 REAL WORKING FEATURE: HIDE / LOCK IN PRIVACY FOLDER ENGINE
