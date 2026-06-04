@@ -7,6 +7,11 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: true,
   },
+  plugins: {
+    Media: {
+      androidGalleryMode: true,
+    },
+  },
 };
 
 export default config;
