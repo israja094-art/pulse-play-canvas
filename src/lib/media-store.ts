@@ -332,7 +332,49 @@ export const useMediaStore = () =>
     () => state,
   );
 
-export const deleteVideos = (ids: string[]) => {
+// Best-effort native gallery file delete (file:// path or relative ExternalStorage path)
+const deleteNativeFile = async (rawPath: string): Promise<boolean> => {
+  try {
+    await Filesystem.deleteFile({ path: rawPath });
+    return true;
+  } catch {
+    // Retry treating it as a path relative to ExternalStorage
+    try {
+      await Filesystem.deleteFile({ path: rawPath, directory: Directory.ExternalStorage });
+      return true;
+    } catch (e) {
+      console.warn("native delete failed", e);
+      return false;
+    }
+  }
+};
+
+// Best-effort native gallery file rename
+const renameNativeFile = async (rawPath: string, newTitle: string): Promise<boolean> => {
+  try {
+    const lastSlash = rawPath.lastIndexOf("/");
+    if (lastSlash < 0) return false;
+    const dir = rawPath.slice(0, lastSlash);
+    const oldName = rawPath.slice(lastSlash + 1);
+    const dot = oldName.lastIndexOf(".");
+    const ext = dot >= 0 ? oldName.slice(dot) : "";
+    const safe = newTitle.replace(/[\\/:*?"<>|]/g, "_").trim();
+    const to = `${dir}/${safe}${ext}`;
+    if (to === rawPath) return true;
+    try {
+      await Filesystem.rename({ from: rawPath, to });
+      return true;
+    } catch {
+      await Filesystem.rename({ from: rawPath, to, directory: Directory.ExternalStorage, toDirectory: Directory.ExternalStorage } as any);
+      return true;
+    }
+  } catch (e) {
+    console.warn("native rename failed", e);
+    return false;
+  }
+};
+
+export const deleteVideos = async (ids: string[]) => {
   for (const id of ids) {
     const i = userVideos.findIndex((v) => v.id === id);
     if (i >= 0) {
@@ -340,11 +382,17 @@ export const deleteVideos = (ids: string[]) => {
       userVideos.splice(i, 1);
       void deleteOne(VIDEO_STORE, id);
     } else {
+      // Native gallery video: actually remove the underlying file
+      if (id.startsWith("nv-")) {
+        await deleteNativeFile(id.replace("nv-", ""));
+      }
       deletedV.add(id);
     }
   }
   saveDeleted(LS_DELETED_V, deletedV);
   emit();
+  // Re-scan so the gallery list reflects the real filesystem state
+  void runNativeScan(true);
 };
 
 export const deleteSongs = (ids: string[]) => {
