@@ -413,7 +413,7 @@ export const deleteSongs = (ids: string[]) => {
 // 🔥 REAL WORKING FEATURE: RENAME VIDEOS ENGINE
 export const renameVideoFile = async (id: string, newTitle: string) => {
   if (!newTitle.trim()) return;
-  
+
   renamedMap[id] = newTitle.trim();
   localStorage.setItem(LS_RENAMED_V, JSON.stringify(renamedMap));
 
@@ -427,6 +427,12 @@ export const renameVideoFile = async (id: string, newTitle: string) => {
       targetData.title = newTitle.trim();
       await putOne<PersistedVideo>(VIDEO_STORE, targetData);
     }
+  } else if (id.startsWith("nv-")) {
+    // Native gallery video: actually rename the underlying file
+    const ok = await renameNativeFile(id.replace("nv-", ""), newTitle.trim());
+    emit();
+    if (ok) void runNativeScan(true);
+    return;
   }
   emit();
 };
