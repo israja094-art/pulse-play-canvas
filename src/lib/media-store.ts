@@ -7,9 +7,11 @@ import {
   runNativeScan,
   wireAutoRescan,
 } from "./native-scanner";
+import { requestMediaPermissions } from "./native-ui";
 // 👑 IMPORTING CAPACITOR NATIVE PLUGINS FOR ACTUAL FILE SHARING
 import { Share } from "@capacitor/share";
 import { Filesystem, Directory } from "@capacitor/filesystem";
+import { MediaDelete } from "@capacitor/media-delete";
 
 type State = {
   videos: Video[];
@@ -343,7 +345,31 @@ const normalizeNativePath = (rawPath: string) => {
   };
 };
 
+const requestSystemGalleryDelete = async (rawPath: string): Promise<boolean | null> => {
+  if (typeof window === "undefined") return null;
+
+  try {
+    await requestMediaPermissions();
+    const result = await MediaDelete.deleteMedia({
+      paths: [normalizeNativePath(rawPath).absolute],
+    });
+
+    if (typeof result?.deleted === "boolean") {
+      return result.deleted;
+    }
+  } catch (error) {
+    console.warn("system gallery delete unavailable", error);
+  }
+
+  return null;
+};
+
 const deleteNativeFile = async (rawPath: string): Promise<boolean> => {
+  const systemDeleteResult = await requestSystemGalleryDelete(rawPath);
+  if (systemDeleteResult !== null) {
+    return systemDeleteResult;
+  }
+
   const { absolute, relative } = normalizeNativePath(rawPath);
   const attempts = [
     () => Filesystem.deleteFile({ path: absolute }),
@@ -415,9 +441,13 @@ export const deleteVideos = async (ids: string[]) => {
           continue;
         }
       }
+      delete renamedMap[id];
+      privacyV.delete(id);
       deletedV.add(id);
     }
   }
+  localStorage.setItem(LS_RENAMED_V, JSON.stringify(renamedMap));
+  saveDeleted(LS_PRIVACY_V, privacyV);
   saveDeleted(LS_DELETED_V, deletedV);
   emit();
   // Re-scan so the gallery list reflects the real filesystem state
