@@ -8,12 +8,13 @@ import android.net.Uri;
 import android.os.Build;
 import android.provider.MediaStore;
 
+import androidx.activity.result.ActivityResult;
+
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
-import com.getcapacitor.PluginResult;
 import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
@@ -74,7 +75,7 @@ public class MediaDeletePlugin extends Plugin {
     }
 
     @ActivityCallback
-    private void deleteMediaResult(PluginCall call, PluginResult activityResult) {
+    private void deleteMediaResult(PluginCall call, ActivityResult activityResult) {
         PluginCall targetCall = pendingDeleteCall != null ? pendingDeleteCall : call;
         pendingDeleteCall = null;
         JSObject result = new JSObject();
