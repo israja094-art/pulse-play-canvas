@@ -49,7 +49,7 @@ export function PermissionGate() {
         <h2 className="text-lg font-semibold">Allow access to Videos & Music</h2>
         <p className="text-sm text-muted-foreground">
           ZabPlay needs permission to read videos and music from your phone so they show up
-          automatically from the gallery. Your files never leave your device.
+          automatically from the gallery and so Android can confirm permanent delete requests. Your files never leave your device.
         </p>
         {denied && (
           <p className="text-xs text-destructive">

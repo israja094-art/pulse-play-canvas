@@ -15,6 +15,7 @@
     "@capacitor-community/media": "^6",
     "@capacitor/app": "^6",
     "@capacitor/core": "^6",
+    "@capacitor/media-delete": "file:plugins/capacitor-media-delete",
     "@capacitor/dialog": "^6",
     "@capacitor/filesystem": "^6.0.0",
     "@capacitor/screen-orientation": "^6",

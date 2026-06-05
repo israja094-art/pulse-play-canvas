@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
   Circle,
@@ -147,21 +147,29 @@ function Index() {
     return () => window.removeEventListener("click", closeMenu);
   }, [showMenuDropdown]);
 
-  const query = q.trim().toLowerCase();
-  const filteredVideos = videos.filter(
-    (v) =>
-      v.title.toLowerCase().includes(query) ||
-      getFolderName(v.src).toLowerCase().includes(query),
+  const deferredQuery = useDeferredValue(q);
+  const query = deferredQuery.trim().toLowerCase();
+  const filteredVideos = useMemo(
+    () =>
+      videos.filter(
+        (v) =>
+          v.title.toLowerCase().includes(query) ||
+          getFolderName(v.src).toLowerCase().includes(query),
+      ),
+    [videos, query],
   );
 
-  const foldersMap: Record<string, typeof videos> = {};
-  filteredVideos.forEach((video) => {
-    const folderName = getFolderName(video.src);
-    if (!foldersMap[folderName]) {
-      foldersMap[folderName] = [];
-    }
-    foldersMap[folderName].push(video);
-  });
+  const foldersMap = useMemo(() => {
+    const map: Record<string, typeof videos> = {};
+    filteredVideos.forEach((video) => {
+      const folderName = getFolderName(video.src);
+      if (!map[folderName]) {
+        map[folderName] = [];
+      }
+      map[folderName].push(video);
+    });
+    return map;
+  }, [filteredVideos]);
 
   let contentLayout;
 
@@ -284,7 +292,7 @@ function Index() {
       } catch {
         await showNativeAlert(
           "Delete failed",
-          "Android ne is file ko direct remove nahi kiya. Naya APK install karke permission allow karo, phir dobara try karo.",
+          "Android ne gallery delete approve nahi kiya. System delete permission allow karke dobara try karo. Agar preview/web me ho to real delete sirf APK build me chalega.",
         );
         return;
       }
@@ -523,6 +531,7 @@ function Index() {
                   type="text"
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
                   placeholder="Search videos..."
                   className="w-full bg-secondary/50 text-sm text-foreground placeholder:text-muted-foreground pl-4 pr-10 py-2 rounded-xl border border-border/40 focus:outline-none focus:border-primary/50 transition-all"
                   autoFocus
@@ -601,7 +610,11 @@ function Index() {
       )}
 
       {/* --- MAIN CONTENT DISPLAY AREA --- */}
-      {filteredVideos.length === 0 ? (
+      {query && filteredVideos.length === 0 ? (
+        <div className="px-6 py-16 text-center text-muted-foreground text-sm">
+          No videos or folders matched “{q.trim()}”.
+        </div>
+      ) : filteredVideos.length === 0 ? (
         <div className="px-6 py-16 text-center text-muted-foreground text-sm">
           No videos yet. Drop videos into your storage to start playing.
         </div>
