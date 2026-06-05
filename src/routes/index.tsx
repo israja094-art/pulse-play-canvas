@@ -292,7 +292,7 @@ function Index() {
       } catch {
         await showNativeAlert(
           "Delete failed",
-          "Android ne is file ko direct remove nahi kiya. Naya APK install karke permission allow karo, phir dobara try karo.",
+          "Android ne gallery delete approve nahi kiya. System delete permission allow karke dobara try karo. Agar preview/web me ho to real delete sirf APK build me chalega.",
         );
         return;
       }
