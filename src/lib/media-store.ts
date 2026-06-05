@@ -8,10 +8,10 @@ import {
   wireAutoRescan,
 } from "./native-scanner";
 import { requestMediaPermissions } from "./native-ui";
+import { MediaDelete } from "./media-delete";
 // 👑 IMPORTING CAPACITOR NATIVE PLUGINS FOR ACTUAL FILE SHARING
 import { Share } from "@capacitor/share";
 import { Filesystem, Directory } from "@capacitor/filesystem";
-import { MediaDelete } from "@capacitor/media-delete";
 
 type State = {
   videos: Video[];
