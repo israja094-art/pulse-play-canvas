@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import React, { useDeferredValue, useEffect, useMemo, useState } from "react";
+import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
   Circle,
@@ -68,6 +68,7 @@ function Index() {
   const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [showSearchInput, setShowSearchInput] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [selectMode, setSelectMode] = useState(false);
   const [showMenuDropdown, setShowMenuDropdown] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -146,6 +147,15 @@ function Index() {
     window.addEventListener("click", closeMenu);
     return () => window.removeEventListener("click", closeMenu);
   }, [showMenuDropdown]);
+
+  useEffect(() => {
+    if (!showSearchInput) return;
+    const timer = window.setTimeout(() => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.click();
+    }, 60);
+    return () => window.clearTimeout(timer);
+  }, [showSearchInput]);
 
   const deferredQuery = useDeferredValue(q);
   const query = deferredQuery.trim().toLowerCase();
