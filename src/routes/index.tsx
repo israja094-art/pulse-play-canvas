@@ -485,7 +485,11 @@ function Index() {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      setShowSearchInput((prev) => !prev);
+                      setShowSearchInput((prev) => {
+                        const next = !prev;
+                        if (!next) setQ("");
+                        return next;
+                      });
                     }}
                   className={`p-2 rounded-full transition-colors ${showSearchInput ? "bg-primary/20 text-primary" : "text-foreground/80 active:bg-secondary"}`}
                   aria-label="Toggle search input"
@@ -538,13 +542,19 @@ function Index() {
             {showSearchInput && (
               <div className="relative animate-slideDown w-full">
                 <input
+                  ref={searchInputRef}
                   type="text"
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   onClick={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
                   placeholder="Search videos..."
                   className="w-full bg-secondary/50 text-sm text-foreground placeholder:text-muted-foreground pl-4 pr-10 py-2 rounded-xl border border-border/40 focus:outline-none focus:border-primary/50 transition-all"
-                  autoFocus
+                  enterKeyHint="search"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                 />
                 {q && (
                   <button onClick={() => setQ("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
