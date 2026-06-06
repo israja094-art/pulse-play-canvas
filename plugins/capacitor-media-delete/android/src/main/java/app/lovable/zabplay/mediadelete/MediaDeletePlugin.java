@@ -8,6 +8,7 @@ import android.content.IntentSender;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Environment;
 import android.provider.MediaStore;
 
 import com.getcapacitor.JSArray;
@@ -15,6 +16,7 @@ import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.io.File;
@@ -23,9 +25,6 @@ import java.util.List;
 
 @CapacitorPlugin(name = "MediaDelete")
 public class MediaDeletePlugin extends Plugin {
-    private static final int DELETE_REQUEST_CODE = 0xDEAD;
-    private PluginCall pendingDeleteCall;
-
     @PluginMethod
     public void deleteMedia(PluginCall call) {
         JSArray paths = call.getArray("paths");
@@ -54,15 +53,12 @@ public class MediaDeletePlugin extends Plugin {
                     getContext().getContentResolver(),
                     mediaUris
                 );
-                pendingDeleteCall = call;
-                IntentSender sender = pendingIntent.getIntentSender();
                 Activity activity = getActivity();
                 if (activity == null) {
-                    pendingDeleteCall = null;
                     call.reject("No activity available");
                     return;
                 }
-                activity.startIntentSenderForResult(sender, DELETE_REQUEST_CODE, null, 0, 0, 0);
+                startIntentSenderForResult(call, pendingIntent.getIntentSender(), "deleteMediaResult");
                 return;
             }
 
@@ -81,22 +77,16 @@ public class MediaDeletePlugin extends Plugin {
         }
     }
 
-    @Override
-    protected void handleOnActivityResult(int requestCode, int resultCode, Intent data) {
-        super.handleOnActivityResult(requestCode, resultCode, data);
-        if (requestCode != DELETE_REQUEST_CODE) {
+    @ActivityCallback
+    private void deleteMediaResult(PluginCall call, com.getcapacitor.ActivityResult result) {
+        if (call == null) {
             return;
         }
-        PluginCall targetCall = pendingDeleteCall;
-        pendingDeleteCall = null;
-        if (targetCall == null) {
-            return;
-        }
-        boolean ok = resultCode == Activity.RESULT_OK;
+        boolean ok = result.getResultCode() == Activity.RESULT_OK;
         JSObject result = new JSObject();
         result.put("deleted", ok);
         result.put("count", ok ? 1 : 0);
-        targetCall.resolve(result);
+        call.resolve(result);
     }
 
     private Uri resolveMediaUri(String rawPath) {
@@ -105,8 +95,17 @@ public class MediaDeletePlugin extends Plugin {
             .replace("file://", "")
             .replace("/sdcard/", "/storage/emulated/0/");
 
+        Uri direct = Uri.parse(normalized);
+        if ("content".equalsIgnoreCase(direct.getScheme())) {
+            return direct;
+        }
+
         Uri videoUri = queryUri(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, normalized);
         if (videoUri != null) return videoUri;
+        Uri audioUri = queryUri(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, normalized);
+        if (audioUri != null) return audioUri;
+        Uri imageUri = queryUri(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, normalized);
+        if (imageUri != null) return imageUri;
         Uri filesUri = queryUri(MediaStore.Files.getContentUri("external"), normalized);
         if (filesUri != null) return filesUri;
         return null;
@@ -114,7 +113,12 @@ public class MediaDeletePlugin extends Plugin {
 
     private Uri queryUri(Uri collection, String absolutePath) {
         ContentResolver resolver = getContext().getContentResolver();
-        String[] projection = new String[] { MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DATA };
+        String[] projection = new String[] {
+            MediaStore.MediaColumns._ID,
+            MediaStore.MediaColumns.DATA,
+            MediaStore.MediaColumns.RELATIVE_PATH,
+            MediaStore.MediaColumns.DISPLAY_NAME
+        };
         Cursor cursor = null;
         try {
             cursor = resolver.query(collection, projection, null, null, null);
@@ -122,10 +126,13 @@ public class MediaDeletePlugin extends Plugin {
 
             int idIndex = cursor.getColumnIndex(MediaStore.MediaColumns._ID);
             int dataIndex = cursor.getColumnIndex(MediaStore.MediaColumns.DATA);
+            int relativeIndex = cursor.getColumnIndex(MediaStore.MediaColumns.RELATIVE_PATH);
+            int displayNameIndex = cursor.getColumnIndex(MediaStore.MediaColumns.DISPLAY_NAME);
             while (cursor.moveToNext()) {
                 String path = dataIndex >= 0 ? cursor.getString(dataIndex) : null;
-                if (path == null) continue;
-                if (sameFile(path, absolutePath)) {
+                String relativePath = relativeIndex >= 0 ? cursor.getString(relativeIndex) : null;
+                String displayName = displayNameIndex >= 0 ? cursor.getString(displayNameIndex) : null;
+                if (matchesPath(path, relativePath, displayName, absolutePath)) {
                     long id = cursor.getLong(idIndex);
                     return Uri.withAppendedPath(collection, String.valueOf(id));
                 }
@@ -135,6 +142,19 @@ public class MediaDeletePlugin extends Plugin {
             if (cursor != null) cursor.close();
         }
         return null;
+    }
+
+    private boolean matchesPath(String dataPath, String relativePath, String displayName, String absolutePath) {
+        if (dataPath != null && sameFile(dataPath, absolutePath)) {
+            return true;
+        }
+        if (relativePath == null || displayName == null) {
+            return false;
+        }
+
+        String rel = relativePath.replaceAll("^/+", "");
+        String candidate = Environment.getExternalStorageDirectory().getAbsolutePath() + "/" + rel + displayName;
+        return sameFile(candidate, absolutePath);
     }
 
     private boolean sameFile(String a, String b) {

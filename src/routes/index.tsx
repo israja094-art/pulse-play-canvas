@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
   Circle,
@@ -68,6 +68,7 @@ function Index() {
   const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [showSearchInput, setShowSearchInput] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [selectMode, setSelectMode] = useState(false);
   const [showMenuDropdown, setShowMenuDropdown] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -121,7 +122,7 @@ function Index() {
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [videos, q, activeTab, currentFolder]);
+  }, [activeTab, currentFolder]);
 
   useEffect(() => {
     const triggerFirstScan = async () => {
@@ -147,14 +148,27 @@ function Index() {
     return () => window.removeEventListener("click", closeMenu);
   }, [showMenuDropdown]);
 
+  useEffect(() => {
+    if (!showSearchInput) return;
+    const timer = window.setTimeout(() => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.click();
+    }, 60);
+    return () => window.clearTimeout(timer);
+  }, [showSearchInput]);
+
   const deferredQuery = useDeferredValue(q);
   const query = deferredQuery.trim().toLowerCase();
+  const historyProgressMap = useMemo(
+    () => Object.fromEntries(watchingHistory.map((item) => [item.id, item.progress])),
+    [watchingHistory],
+  );
   const filteredVideos = useMemo(
     () =>
       videos.filter(
         (v) =>
           v.title.toLowerCase().includes(query) ||
-          getFolderName(v.src).toLowerCase().includes(query),
+          (v.folder || getFolderName(v.src)).toLowerCase().includes(query),
       ),
     [videos, query],
   );
@@ -162,7 +176,7 @@ function Index() {
   const foldersMap = useMemo(() => {
     const map: Record<string, typeof videos> = {};
     filteredVideos.forEach((video) => {
-      const folderName = getFolderName(video.src);
+      const folderName = video.folder || getFolderName(video.src);
       if (!map[folderName]) {
         map[folderName] = [];
       }
@@ -188,6 +202,7 @@ function Index() {
             }}
             onToggle={() => toggle(v.id)}
             onLongPress={() => enterSelect(v.id)}
+            progress={historyProgressMap[v.id] ?? 0}
           />
         ))}
       </ul>
@@ -219,6 +234,7 @@ function Index() {
                 }}
                 onToggle={() => toggle(v.id)}
                 onLongPress={() => enterSelect(v.id)}
+                  progress={historyProgressMap[v.id] ?? 0}
               />
             ))}
           </ul>
@@ -289,10 +305,14 @@ function Index() {
     if (ok) {
       try {
         await deleteVideos([...selected]);
-      } catch {
+      } catch (error) {
+        const message =
+          error instanceof Error && error.message === "permission-denied"
+            ? "Android permission allow nahi hui. Photos & videos permission allow karke dobara try karo."
+            : "Video ko gallery se delete nahi kiya ja saka. Naya APK install karke dobara try karo, phir Android ke system delete prompt ko allow karo.";
         await showNativeAlert(
           "Delete failed",
-          "Android ne gallery delete approve nahi kiya. System delete permission allow karke dobara try karo. Agar preview/web me ho to real delete sirf APK build me chalega.",
+          message,
         );
         return;
       }
@@ -475,7 +495,11 @@ function Index() {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      setShowSearchInput((prev) => !prev);
+                      setShowSearchInput((prev) => {
+                        const next = !prev;
+                        if (!next) setQ("");
+                        return next;
+                      });
                     }}
                   className={`p-2 rounded-full transition-colors ${showSearchInput ? "bg-primary/20 text-primary" : "text-foreground/80 active:bg-secondary"}`}
                   aria-label="Toggle search input"
@@ -528,13 +552,19 @@ function Index() {
             {showSearchInput && (
               <div className="relative animate-slideDown w-full">
                 <input
+                  ref={searchInputRef}
                   type="text"
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   onClick={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
                   placeholder="Search videos..."
                   className="w-full bg-secondary/50 text-sm text-foreground placeholder:text-muted-foreground pl-4 pr-10 py-2 rounded-xl border border-border/40 focus:outline-none focus:border-primary/50 transition-all"
-                  autoFocus
+                  enterKeyHint="search"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                 />
                 {q && (
                   <button onClick={() => setQ("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
@@ -734,46 +764,24 @@ function Index() {
   );
 }
 
-function VideoRow({
+const VideoRow = React.memo(function VideoRow({
   video,
   selectMode,
   selected,
   onOpen,
   onToggle,
   onLongPress,
+  progress,
 }: {
-  video: { id: string; title: string; duration: string; thumb: string; src: string };
+  video: { id: string; title: string; duration: string; thumb: string; src: string; folder?: string };
   selectMode: boolean;
   selected: boolean;
   onOpen: () => void;
   onToggle: () => void;
   onLongPress: () => void;
+  progress: number;
 }) {
   const { didTrigger, ...pressHandlers } = useLongPress(onLongPress, 450);
-  const [progress, setProgress] = useState(0);
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("zabplay_watching_history");
-      if (raw) {
-        const parsed: HistoryItem[] = JSON.parse(raw);
-        const currentItem = parsed.find(h => h.id === video.id);
-        if (currentItem) {
-          setProgress(currentItem.progress);
-        }
-      }
-    } catch {
-      const saved = localStorage.getItem(`history_${video.src}`);
-      if (saved) {
-        const parts = video.duration.split(':').map(Number);
-        const totalSec = parts.length === 2 ? parts[0] * 60 + parts[1] : 0;
-        if (totalSec > 0) {
-          const p = (parseFloat(saved) / totalSec) * 100;
-          setProgress(Math.min(p, 100));
-        }
-      }
-    }
-  }, [video.id, video.src, video.duration]);
 
   return (
     <li>
@@ -812,10 +820,10 @@ function VideoRow({
           <p className="text-sm text-foreground line-clamp-2 font-medium">{video.title}</p>
           <p className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground truncate">
             <Folder className="h-3 w-3 text-primary flex-shrink-0" />
-            <span className="truncate">{getFolderName(video.src)}</span>
+            <span className="truncate">{video.folder || getFolderName(video.src)}</span>
           </p>
         </div>
       </button>
     </li>
   );
-    }
+    });

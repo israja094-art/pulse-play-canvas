@@ -177,10 +177,14 @@ function VideoPage() {
                       }
                       try {
                         await deleteVideos([v.id]);
-                      } catch {
+                      } catch (error) {
+                        const message =
+                          error instanceof Error && error.message === "permission-denied"
+                            ? "Android permission allow nahi hui. Photos & videos permission allow karke dobara try karo."
+                            : "Video ko gallery se delete nahi kiya ja saka. Naya APK install karke dobara try karo, phir Android ke system delete prompt ko allow karo.";
                         await showNativeAlert(
                           "Delete failed",
-                          "Android ne gallery delete approve nahi kiya. System delete permission allow karke dobara try karo. Agar preview/web me ho to real delete sirf APK build me chalega.",
+                          message,
                         );
                         setOpenMenu(null);
                         return;

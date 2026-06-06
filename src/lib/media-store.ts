@@ -170,40 +170,39 @@ const probeNativeMediaBackground = async () => {
 
   const nv = getNativeVideos();
   const ns = getNativeSongs();
+  let hasUpdates = false;
 
-  // 1. Process Videos with Smooth Time-Slicing Breaks
   for (const video of nv) {
     if (!nativeDurationCache.has(video.id) || nativeDurationCache.get(video.id)?.duration === "") {
       try {
-        await sleep(300);
-        
-        const meta = await probeVideo(video.src);
+        await sleep(600);
+        const meta = await probeVideo(video.src, true);
         if (meta.duration && meta.duration !== "00:00") {
           nativeDurationCache.set(video.id, meta);
-          queueMicrotask(() => emit());
+          hasUpdates = true;
         }
       } catch (e) {
-        console.warn("Background video probe skip to avoid lag", e);
+        console.warn("Background video probe skip", e);
       }
     }
   }
 
-  // 2. Process Songs with Smooth Breaks
   for (const song of ns) {
     if (!nativeDurationCache.has(song.id) || nativeDurationCache.get(song.id)?.duration === "") {
       try {
-        await sleep(150);
-        
+        await sleep(300);
         const d = await probeAudioDuration(song.src);
         if (d && d !== "00:00") {
           nativeDurationCache.set(song.id, { duration: d });
-          queueMicrotask(() => emit());
+          hasUpdates = true;
         }
       } catch (e) {
-        console.warn("Background audio probe skip to avoid lag", e);
+        console.warn("Background audio probe skip", e);
       }
     }
   }
+
+  if (hasUpdates) emit();
 
   isProbingBackground = false;
 };
@@ -308,7 +307,7 @@ const subscribe = (l: () => void) => {
     renamedMap = loadRenamedMap(); // Loading active custom titles map
     renamedSongMap = loadRenamedSongMap(); // Loading active song custom titles
     playlist = loadPlaylist(); // Loading default playlist
-    queueMicrotask(() => emit());
+    // queueMicrotask(() => emit());
     void hydratePersistedMedia();
     
     subscribeNativeMedia(() => {
@@ -349,7 +348,11 @@ const requestSystemGalleryDelete = async (rawPath: string): Promise<boolean | nu
   if (typeof window === "undefined") return null;
 
   try {
-    await requestMediaPermissions();
+    const granted = await requestMediaPermissions();
+    if (!granted) {
+      throw new Error("permission-denied");
+    }
+
     const result = await MediaDelete.deleteMedia({
       paths: [normalizeNativePath(rawPath).absolute],
     });
@@ -359,15 +362,24 @@ const requestSystemGalleryDelete = async (rawPath: string): Promise<boolean | nu
     }
   } catch (error) {
     console.warn("system gallery delete unavailable", error);
+    if (error instanceof Error && error.message === "permission-denied") {
+      throw error;
+    }
   }
 
   return null;
 };
 
 const deleteNativeFile = async (rawPath: string): Promise<boolean> => {
-  const systemDeleteResult = await requestSystemGalleryDelete(rawPath);
-  if (systemDeleteResult !== null) {
-    return systemDeleteResult;
+  try {
+    const systemDeleteResult = await requestSystemGalleryDelete(rawPath);
+    if (systemDeleteResult !== null) {
+      return systemDeleteResult;
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message === "permission-denied") {
+      throw error;
+    }
   }
 
   const { absolute, relative } = normalizeNativePath(rawPath);
@@ -546,7 +558,7 @@ export const setPrivacyPin = (pin: string) => {
   localStorage.setItem(LS_PRIVACY_PIN, pin);
 };
 
-const probeVideo = (url: string): Promise<{ duration: string; thumb: string }> =>
+const probeVideo = (url: string, skipThumb = false): Promise<{ duration: string; thumb: string }> =>
   new Promise((resolve) => {
     const v = document.createElement("video");
     v.preload = "metadata";
@@ -569,6 +581,7 @@ const probeVideo = (url: string): Promise<{ duration: string; thumb: string }> =
       }
     });
     v.addEventListener("seeked", () => {
+      if (skipThumb) return done(fmtDuration(v.duration), "");
       try {
         const c = document.createElement("canvas");
         c.width = 320;

@@ -101,6 +101,7 @@ const scanDir = async (
           out.videos.push({
             id: `nv-${uri}`,
             title: titleFromPath(entry.name),
+            folder: base.split("/").pop() || "Main Storage",
             duration: "",
             thumb: VIDEO_THUMB_PLACEHOLDER,
             // --- FOLDER SEPARATION PATH ENHANCEMENT ---
@@ -111,6 +112,7 @@ const scanDir = async (
           out.songs.push({
             id: `ns-${uri}`,
             title: titleFromPath(entry.name),
+            folder: base.split("/").pop() || "Main Storage",
             artist: "Device audio",
             duration: "",
             cover: SONG_COVER_PLACEHOLDER,
