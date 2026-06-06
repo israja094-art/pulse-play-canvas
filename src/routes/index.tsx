@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import React, { useDeferredValue, useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
   Circle,
@@ -121,7 +121,7 @@ function Index() {
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [videos, q, activeTab, currentFolder]);
+  }, [activeTab, currentFolder]);
 
   useEffect(() => {
     const triggerFirstScan = async () => {
@@ -154,7 +154,7 @@ function Index() {
       videos.filter(
         (v) =>
           v.title.toLowerCase().includes(query) ||
-          getFolderName(v.src).toLowerCase().includes(query),
+          (v.folder || getFolderName(v.src)).toLowerCase().includes(query),
       ),
     [videos, query],
   );
@@ -162,7 +162,7 @@ function Index() {
   const foldersMap = useMemo(() => {
     const map: Record<string, typeof videos> = {};
     filteredVideos.forEach((video) => {
-      const folderName = getFolderName(video.src);
+      const folderName = video.folder || getFolderName(video.src);
       if (!map[folderName]) {
         map[folderName] = [];
       }
@@ -734,7 +734,7 @@ function Index() {
   );
 }
 
-function VideoRow({
+const VideoRow = React.memo(function VideoRow({
   video,
   selectMode,
   selected,
@@ -812,10 +812,10 @@ function VideoRow({
           <p className="text-sm text-foreground line-clamp-2 font-medium">{video.title}</p>
           <p className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground truncate">
             <Folder className="h-3 w-3 text-primary flex-shrink-0" />
-            <span className="truncate">{getFolderName(video.src)}</span>
+            <span className="truncate">{video.folder || getFolderName(video.src)}</span>
           </p>
         </div>
       </button>
     </li>
   );
-    }
+    });
