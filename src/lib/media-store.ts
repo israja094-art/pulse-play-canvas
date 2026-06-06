@@ -177,10 +177,10 @@ const probeNativeMediaBackground = async () => {
       try {
         await sleep(300);
         
-        const meta = await probeVideo(video.src);
+        const meta = await probeVideo(video.src, true);
         if (meta.duration && meta.duration !== "00:00") {
           nativeDurationCache.set(video.id, meta);
-          queueMicrotask(() => emit());
+          // queueMicrotask(() => emit());
         }
       } catch (e) {
         console.warn("Background video probe skip to avoid lag", e);
@@ -197,7 +197,7 @@ const probeNativeMediaBackground = async () => {
         const d = await probeAudioDuration(song.src);
         if (d && d !== "00:00") {
           nativeDurationCache.set(song.id, { duration: d });
-          queueMicrotask(() => emit());
+          // queueMicrotask(() => emit());
         }
       } catch (e) {
         console.warn("Background audio probe skip to avoid lag", e);
@@ -308,7 +308,7 @@ const subscribe = (l: () => void) => {
     renamedMap = loadRenamedMap(); // Loading active custom titles map
     renamedSongMap = loadRenamedSongMap(); // Loading active song custom titles
     playlist = loadPlaylist(); // Loading default playlist
-    queueMicrotask(() => emit());
+    // queueMicrotask(() => emit());
     void hydratePersistedMedia();
     
     subscribeNativeMedia(() => {
@@ -546,7 +546,7 @@ export const setPrivacyPin = (pin: string) => {
   localStorage.setItem(LS_PRIVACY_PIN, pin);
 };
 
-const probeVideo = (url: string): Promise<{ duration: string; thumb: string }> =>
+const probeVideo = (url: string, skipThumb = false): Promise<{ duration: string; thumb: string }> =>
   new Promise((resolve) => {
     const v = document.createElement("video");
     v.preload = "metadata";
@@ -569,6 +569,7 @@ const probeVideo = (url: string): Promise<{ duration: string; thumb: string }> =
       }
     });
     v.addEventListener("seeked", () => {
+      if (skipThumb) return done(fmtDuration(v.duration), "");
       try {
         const c = document.createElement("canvas");
         c.width = 320;

@@ -4,6 +4,7 @@ export type Video = {
   duration: string;
   thumb: string;
   src: string;
+  folder?: string;
   progress?: number; // Ye naya field hai history track karne ke liye
 };
 
@@ -14,6 +15,7 @@ export type Song = {
   cover: string;
   duration: string;
   src: string;
+  folder?: string;
 };
 
 export const videos: Video[] = [];
