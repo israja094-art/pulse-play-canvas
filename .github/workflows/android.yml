@@ -64,15 +64,22 @@ jobs:
           fi
           cat "$MANIFEST"
 
-      - name: Build debug APK
+      - name: Build debug APK + AAB
         working-directory: android
         run: |
           chmod +x ./gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleDebug bundleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: ZabPlay-debug-apk
           path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZabPlay-debug-aab
+          path: android/app/build/outputs/bundle/debug/*.aab
           if-no-files-found: error
