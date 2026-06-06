@@ -11,8 +11,6 @@ import android.os.Build;
 import android.os.Environment;
 import android.provider.MediaStore;
 
-import androidx.activity.result.ActivityResult;
-
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -60,11 +58,7 @@ public class MediaDeletePlugin extends Plugin {
                     call.reject("No activity available");
                     return;
                 }
-                
-                // Capacitor के नए वर्जन के लिए सही तरीका (Fix for startIntentSenderForResult)
-                Intent intent = new Intent();
-                intent.putExtra("intent_sender", pendingIntent.getIntentSender());
-                startActivityForResult(call, intent, "deleteMediaResult");
+                startIntentSenderForResult(call, pendingIntent.getIntentSender(), "deleteMediaResult");
                 return;
             }
 
@@ -74,25 +68,25 @@ public class MediaDeletePlugin extends Plugin {
                 deleted += resolver.delete(uri, null, null);
             }
 
-            JSObject res = new JSObject();
-            res.put("deleted", deleted > 0);
-            res.put("count", deleted);
-            call.resolve(res);
+            JSObject result = new JSObject();
+            result.put("deleted", deleted > 0);
+            result.put("count", deleted);
+            call.resolve(result);
         } catch (Exception ex) {
             call.reject("delete-failed", ex);
         }
     }
 
     @ActivityCallback
-    private void deleteMediaResult(PluginCall call, ActivityResult result) {
+    private void deleteMediaResult(PluginCall call, com.getcapacitor.ActivityResult result) {
         if (call == null) {
             return;
         }
         boolean ok = result.getResultCode() == Activity.RESULT_OK;
-        JSObject res = new JSObject();
-        res.put("deleted", ok);
-        res.put("count", ok ? 1 : 0);
-        call.resolve(res);
+        JSObject result = new JSObject();
+        result.put("deleted", ok);
+        result.put("count", ok ? 1 : 0);
+        call.resolve(result);
     }
 
     private Uri resolveMediaUri(String rawPath) {
