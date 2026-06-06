@@ -348,7 +348,11 @@ const requestSystemGalleryDelete = async (rawPath: string): Promise<boolean | nu
   if (typeof window === "undefined") return null;
 
   try {
-    await requestMediaPermissions();
+    const granted = await requestMediaPermissions();
+    if (!granted) {
+      throw new Error("permission-denied");
+    }
+
     const result = await MediaDelete.deleteMedia({
       paths: [normalizeNativePath(rawPath).absolute],
     });
@@ -358,15 +362,24 @@ const requestSystemGalleryDelete = async (rawPath: string): Promise<boolean | nu
     }
   } catch (error) {
     console.warn("system gallery delete unavailable", error);
+    if (error instanceof Error && error.message === "permission-denied") {
+      throw error;
+    }
   }
 
   return null;
 };
 
 const deleteNativeFile = async (rawPath: string): Promise<boolean> => {
-  const systemDeleteResult = await requestSystemGalleryDelete(rawPath);
-  if (systemDeleteResult !== null) {
-    return systemDeleteResult;
+  try {
+    const systemDeleteResult = await requestSystemGalleryDelete(rawPath);
+    if (systemDeleteResult !== null) {
+      return systemDeleteResult;
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message === "permission-denied") {
+      throw error;
+    }
   }
 
   const { absolute, relative } = normalizeNativePath(rawPath);
