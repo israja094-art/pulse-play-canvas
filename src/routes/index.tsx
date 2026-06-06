@@ -159,6 +159,10 @@ function Index() {
 
   const deferredQuery = useDeferredValue(q);
   const query = deferredQuery.trim().toLowerCase();
+  const historyProgressMap = useMemo(
+    () => Object.fromEntries(watchingHistory.map((item) => [item.id, item.progress])),
+    [watchingHistory],
+  );
   const filteredVideos = useMemo(
     () =>
       videos.filter(
@@ -198,6 +202,7 @@ function Index() {
             }}
             onToggle={() => toggle(v.id)}
             onLongPress={() => enterSelect(v.id)}
+            progress={historyProgressMap[v.id] ?? 0}
           />
         ))}
       </ul>
@@ -229,6 +234,7 @@ function Index() {
                 }}
                 onToggle={() => toggle(v.id)}
                 onLongPress={() => enterSelect(v.id)}
+                  progress={historyProgressMap[v.id] ?? 0}
               />
             ))}
           </ul>
