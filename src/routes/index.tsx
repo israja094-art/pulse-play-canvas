@@ -762,7 +762,7 @@ const VideoRow = React.memo(function VideoRow({
   onToggle,
   onLongPress,
 }: {
-  video: { id: string; title: string; duration: string; thumb: string; src: string };
+  video: { id: string; title: string; duration: string; thumb: string; src: string; folder?: string };
   selectMode: boolean;
   selected: boolean;
   onOpen: () => void;
