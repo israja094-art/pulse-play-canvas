@@ -170,7 +170,7 @@ const probeNativeMediaBackground = async () => {
 
   const nv = getNativeVideos();
   const ns = getNativeSongs();
-  let count = 0;
+  let hasUpdates = false;
 
   for (const video of nv) {
     if (!nativeDurationCache.has(video.id) || nativeDurationCache.get(video.id)?.duration === "") {
@@ -179,15 +179,13 @@ const probeNativeMediaBackground = async () => {
         const meta = await probeVideo(video.src, true);
         if (meta.duration && meta.duration !== "00:00") {
           nativeDurationCache.set(video.id, meta);
-          count++;
-          if (count % 10 === 0) emit();
+          hasUpdates = true;
         }
       } catch (e) {
         console.warn("Background video probe skip", e);
       }
     }
   }
-  if (count > 0) { emit(); count = 0; }
 
   for (const song of ns) {
     if (!nativeDurationCache.has(song.id) || nativeDurationCache.get(song.id)?.duration === "") {
@@ -196,15 +194,15 @@ const probeNativeMediaBackground = async () => {
         const d = await probeAudioDuration(song.src);
         if (d && d !== "00:00") {
           nativeDurationCache.set(song.id, { duration: d });
-          count++;
-          if (count % 15 === 0) emit();
+          hasUpdates = true;
         }
       } catch (e) {
         console.warn("Background audio probe skip", e);
       }
     }
   }
-  if (count > 0) emit();
+
+  if (hasUpdates) emit();
 
   isProbingBackground = false;
 };
