@@ -3,19 +3,18 @@ package app.lovable.zabplay.mediadelete;
 import android.app.Activity;
 import android.app.PendingIntent;
 import android.content.ContentResolver;
+import android.content.Intent;
+import android.content.IntentSender;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.MediaStore;
-
-import androidx.activity.result.ActivityResult;
 
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
-import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.io.File;
@@ -24,6 +23,7 @@ import java.util.List;
 
 @CapacitorPlugin(name = "MediaDelete")
 public class MediaDeletePlugin extends Plugin {
+    private static final int DELETE_REQUEST_CODE = 0xDEAD;
     private PluginCall pendingDeleteCall;
 
     @PluginMethod
@@ -55,7 +55,14 @@ public class MediaDeletePlugin extends Plugin {
                     mediaUris
                 );
                 pendingDeleteCall = call;
-                startIntentSenderForResult(call, pendingIntent.getIntentSender(), "deleteMediaResult");
+                IntentSender sender = pendingIntent.getIntentSender();
+                Activity activity = getActivity();
+                if (activity == null) {
+                    pendingDeleteCall = null;
+                    call.reject("No activity available");
+                    return;
+                }
+                activity.startIntentSenderForResult(sender, DELETE_REQUEST_CODE, null, 0, 0, 0);
                 return;
             }
 
@@ -74,17 +81,22 @@ public class MediaDeletePlugin extends Plugin {
         }
     }
 
-    @ActivityCallback
-    private void deleteMediaResult(PluginCall call, ActivityResult activityResult) {
-        PluginCall targetCall = pendingDeleteCall != null ? pendingDeleteCall : call;
+    @Override
+    protected void handleOnActivityResult(int requestCode, int resultCode, Intent data) {
+        super.handleOnActivityResult(requestCode, resultCode, data);
+        if (requestCode != DELETE_REQUEST_CODE) {
+            return;
+        }
+        PluginCall targetCall = pendingDeleteCall;
         pendingDeleteCall = null;
+        if (targetCall == null) {
+            return;
+        }
+        boolean ok = resultCode == Activity.RESULT_OK;
         JSObject result = new JSObject();
-        boolean ok = activityResult != null && activityResult.getResultCode() == Activity.RESULT_OK;
         result.put("deleted", ok);
         result.put("count", ok ? 1 : 0);
-        if (targetCall != null) {
-            targetCall.resolve(result);
-        }
+        targetCall.resolve(result);
     }
 
     private Uri resolveMediaUri(String rawPath) {
