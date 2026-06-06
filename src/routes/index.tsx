@@ -767,6 +767,7 @@ const VideoRow = React.memo(function VideoRow({
   onOpen,
   onToggle,
   onLongPress,
+  progress,
 }: {
   video: { id: string; title: string; duration: string; thumb: string; src: string; folder?: string };
   selectMode: boolean;
@@ -774,32 +775,9 @@ const VideoRow = React.memo(function VideoRow({
   onOpen: () => void;
   onToggle: () => void;
   onLongPress: () => void;
+  progress: number;
 }) {
   const { didTrigger, ...pressHandlers } = useLongPress(onLongPress, 450);
-  const [progress, setProgress] = useState(0);
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("zabplay_watching_history");
-      if (raw) {
-        const parsed: HistoryItem[] = JSON.parse(raw);
-        const currentItem = parsed.find(h => h.id === video.id);
-        if (currentItem) {
-          setProgress(currentItem.progress);
-        }
-      }
-    } catch {
-      const saved = localStorage.getItem(`history_${video.src}`);
-      if (saved) {
-        const parts = video.duration.split(':').map(Number);
-        const totalSec = parts.length === 2 ? parts[0] * 60 + parts[1] : 0;
-        if (totalSec > 0) {
-          const p = (parseFloat(saved) / totalSec) * 100;
-          setProgress(Math.min(p, 100));
-        }
-      }
-    }
-  }, [video.id, video.src, video.duration]);
 
   return (
     <li>
